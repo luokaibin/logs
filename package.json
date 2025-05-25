@@ -1,0 +1,32 @@
+{
+  "name": "logbeacon-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "浏览器端日志上报",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r dev",
+    "test": "pnpm -r test",
+    "clean": "pnpm -r clean"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luokaibin/logs.git"
+  },
+  "keywords": [
+    "logs",
+    "browser",
+    "nextjs"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/luokaibin/logs/issues"
+  },
+  "homepage": "https://github.com/luokaibin/logs#readme",
+  "devDependencies": {
+    "tslib": "^2.5.0",
+    "typescript": "^5.0.0"
+  },
+  "packageManager": "pnpm@10.6.5"
+}
