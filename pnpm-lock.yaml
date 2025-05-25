@@ -6,20 +6,13 @@ settings:
 
 importers:
 
-  .:
-    devDependencies:
-      tslib:
-        specifier: ^2.5.0
-        version: 2.8.1
-      typescript:
-        specifier: ^5.0.0
-        version: 5.8.3
+  .: {}
 
   example/next:
     dependencies:
-      logs:
-        specifier: workspace:*
-        version: link:../../logs
+      logbeacon:
+        specifier: 1.0.0
+        version: 1.0.0
       next:
         specifier: ^14.0.0
         version: 14.2.29(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -82,9 +75,6 @@ importers:
       rollup-plugin-obfuscator:
         specifier: ^1.1.0
         version: 1.1.0(javascript-obfuscator@4.1.1)(rollup@3.29.5)
-      typescript:
-        specifier: ^5.0.0
-        version: 5.8.3
 
 packages:
 
@@ -1296,6 +1286,10 @@ packages:
 
   lodash.merge@4.6.2:
     resolution: {integrity: sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ==}
+
+  logbeacon@1.0.0:
+    resolution: {integrity: sha512-1qDhoEP3bm0GQfF3yr9eqvrGs7y7E3jUOOOaZGF+8k5z7fDHhFj+jYgr6ifjlsSdZQ68HongYOX02HfPCs9C7g==}
+    engines: {node: '>=14.0.0'}
 
   loglevel@1.9.2:
     resolution: {integrity: sha512-HgMmCqIJSAKqo68l0rS2AanEWfkxaZ5wNiEFb5ggm08lDs9Xl2KxBlX3PTcaD2chBM1gXAYf491/M2Rv8Jwayg==}
@@ -3301,6 +3295,15 @@ snapshots:
       p-locate: 5.0.0
 
   lodash.merge@4.6.2: {}
+
+  logbeacon@1.0.0:
+    dependencies:
+      fflate: 0.8.2
+      loglevel: 1.9.2
+      pbf: 4.0.1
+      ua-parser-js: 2.0.3
+    transitivePeerDependencies:
+      - encoding
 
   loglevel@1.9.2: {}
 

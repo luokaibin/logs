@@ -25,8 +25,6 @@
   },
   "homepage": "https://github.com/luokaibin/logs#readme",
   "devDependencies": {
-    "tslib": "^2.5.0",
-    "typescript": "^5.0.0"
   },
   "packageManager": "pnpm@10.6.5"
 }
