@@ -23,7 +23,7 @@ const proxyLoglevelFn = (fn, fnName) => {
       if (!keyWords) {
         return target.apply(thisArg, argumentsList);
       }
-      if (argumentsList[0].startsWith(keyWords)) {
+      if (!argumentsList[0].startsWith(keyWords)) {
         return;
       }
       return target.apply(thisArg, argumentsList);
