@@ -89,7 +89,7 @@ export function getLogExtraInfo() {
  * @param {string} scope - Service Worker 的作用域
  * @returns {Promise<ServiceWorker|null>} 激活的 Service Worker 或 null
  */
-export async function getServiceWorker(scope = '/logs-sw/') {
+export async function getServiceWorker(scope = '/beacon/') {
   if (!navigator.serviceWorker) return null;
   
   try {
@@ -159,8 +159,7 @@ export async function sendLog(level, logs) {
 
   try {
     // 获取指定作用域的 Service Worker
-    const serviceWorker = await getServiceWorker('/logs-sw/');
-    
+    const serviceWorker = await getServiceWorker('/beacon/');
     if (!serviceWorker) {
       const event = new CustomEvent('sendLog', {
         detail: msg

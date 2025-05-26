@@ -12,7 +12,7 @@ export const generateLog = (logEncoder) => {
       
       // 发送事件
       const sendSWEvent = async (event) => {
-        const serviceWorker = await getServiceWorker('/logs-sw/');
+        const serviceWorker = await getServiceWorker('/beacon/');
         if (!serviceWorker) {
           const customEvent = new CustomEvent('sendLog', {
             detail: event
