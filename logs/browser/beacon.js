@@ -21,6 +21,9 @@ export const generateLog = (logEncoder) => {
         } else {
           serviceWorker.postMessage(event);
         }
+        if (serviceWorker && logAggregator.getBufferSize() > 0) {
+          logAggregator.flushLogs();
+        }
       };
 
       // 注册 Service Worker（以 module 方式）
