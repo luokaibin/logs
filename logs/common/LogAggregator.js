@@ -187,13 +187,13 @@ export class LogAggregator {
     const payload = this._logEncoder(this._logBuffer);
     const body = this._compressLogs(payload);
     try {
-      if (typeof fetch !== 'undefined') {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/beacon', body);
+      } else {
         await fetch('/api/beacon', {
           method: 'POST',
           body
         });
-      } else if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/beacon', body);
       }
     } finally {
       this.reset();

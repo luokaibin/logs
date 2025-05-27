@@ -1,17 +1,19 @@
 {
   "name": "logbeacon",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "type": "module",
   "module": "dist/core/logs.js",
   "description": "浏览器端日志采集与上报工具，支持多种日志服务后端，包括阿里云日志服务(SLS)和Grafana Loki",
   "exports": {
     ".": {
       "import": "./dist/core/logs.js",
+      "require": "./dist/core/logs.cjs",
       "types": "./dist/types/logs.d.ts",
       "default": "./dist/core/logs.js"
     },
     "./sls": {
       "import": "./dist/sls/slsClient.js",
+      "require": "./dist/sls/slsClient.cjs",
       "default": "./dist/sls/slsClient.js",
       "types": "./dist/types/slsClient.d.ts"
     },
@@ -25,6 +27,7 @@
     },
     "./loki": {
       "import": "./dist/loki/lokiClient.js",
+      "require": "./dist/loki/lokiClient.cjs",
       "default": "./dist/loki/lokiClient.js",
       "types": "./dist/types/lokiClient.d.ts"
     },
@@ -34,7 +37,7 @@
     },
     "./loki/sw": {
       "import": "./dist/loki/beacon-sw.js",
-      "default": "./dist/sls/beacon-sw.js"
+      "default": "./dist/loki/beacon-sw.js"
     }
   },
   "files": [

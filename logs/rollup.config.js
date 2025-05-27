@@ -46,11 +46,11 @@ const obfuscatorOptions = {
 };
 
 // 混淆器插件
-const obfuscatorPlugin = obfuscator(obfuscatorOptions);
+// const obfuscatorPlugin = obfuscator(obfuscatorOptions);
 
 // 输出格式的通用配置
 const outputConfig = {
-  sourcemap: true,  // 生成 sourcemap 文件，便于调试
+  sourcemap: false,  // 生成 sourcemap 文件，便于调试
   exports: 'auto'   // 自动检测并选择最适合的导出模式（default, named 等）
 };
 
@@ -60,9 +60,16 @@ export default [
     input: 'core/logs.js',
     output: [
       {
+        ...outputConfig,
         file: `dist/core/logs.js`,
         format: 'esm',
-        ...outputConfig
+        sourcemap: true
+      },
+      {
+        ...outputConfig,
+        file: `dist/core/logs.cjs`,
+        format: 'cjs',
+        sourcemap: true
       },
     ],
     plugins: [
@@ -107,9 +114,9 @@ export default [
     input: 'sls/beacon.js',
     output: [
       {
+        ...outputConfig,
         file: 'dist/sls/beacon.js',
         format: 'esm',
-        ...outputConfig,
       },
     ],
     // 使用上面定义的插件数组
@@ -130,9 +137,16 @@ export default [
     input: 'sls/slsClient.js',
     output: [
       {
+        ...outputConfig,
         file: `dist/sls/slsClient.js`,
         format: 'esm',
-        ...outputConfig
+        sourcemap: true
+      },
+      {
+        ...outputConfig,
+        file: `dist/sls/slsClient.cjs`,
+        format: 'cjs',
+        sourcemap: true
       },
     ],
     plugins: [
@@ -203,9 +217,16 @@ export default [
     input: 'loki/lokiClient.js',
     output: [
       {
+        ...outputConfig,
         file: `dist/loki/lokiClient.js`,
         format: 'esm',
-        ...outputConfig
+        sourcemap: true
+      },
+      {
+        ...outputConfig,
+        file: `dist/loki/lokiClient.cjs`,
+        format: 'cjs',
+        sourcemap: true
       },
     ],
     plugins: [
