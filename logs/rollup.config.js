@@ -246,4 +246,37 @@ export default [
     // 外部依赖配置，这些依赖不会被打包进最终文件，而是在运行时加载
     // external: ['loglevel', 'ua-parser-js', 'fflate', 'pbf']
   },
+  // ESLint插件
+  {
+    input: 'eslint/index.js',
+    output: [
+      {
+        ...outputConfig,
+        file: 'dist/eslint/index.js',
+        format: 'cjs',
+        sourcemap: false
+      },
+      {
+        ...outputConfig,
+        file: 'dist/eslint/index.mjs',
+        format: 'esm',
+        sourcemap: false
+      }
+    ],
+    plugins: [
+      resolve({
+        browser: false,
+        preferBuiltins: true
+      }),
+      commonjsPlugin,
+      // 复制 ESLint 插件的类型定义文件到 dist 目录
+      copyTypes({
+        targets: [
+          { src: 'types/eslintPlugin.d.ts', dest: 'dist/types/eslintPlugin.d.ts' }
+        ]
+      })
+      // 注意：不使用terser和obfuscator，保持ESLint插件代码的可读性
+    ],
+    external: ['eslint']
+  },
 ];

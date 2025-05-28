@@ -347,6 +347,90 @@ flowchart LR
 | ip         | 用户的公网IP（每天更新一次）                                 |
 | region     | 用户的地理位置（国家/地区）                                  |
 
+## ESLint 插件
+
+本库提供了 ESLint 插件，可以帮助您将代码中的 `console.xxx` 调用自动替换为 `log.xxx`，保持日志记录的一致性。
+
+### 使用方法
+
+#### 1. 在 ESLint 配置中引入插件
+
+```javascript
+// .eslintrc.js
+const logsTransformPlugin = require('logbeacon/eslint');
+
+module.exports = {
+  plugins: {
+    'logs-transform': logsTransformPlugin
+  },
+  rules: {
+    'logs-transform/prefer-log-over-console': 'warn' // 或 'error'
+  }
+};
+```
+
+#### 2. 配置选项
+
+插件支持以下配置选项，所有配置项都是**可选的**：
+
+```javascript
+// .eslintrc.js
+module.exports = {
+  // ...
+  rules: {
+    'logs-transform/prefer-log-over-console': ['warn', {
+      // 以下所有配置项都是可选的，如果不提供将使用默认值
+      importSource: 'logbeacon',  // 导入源，默认为 'logbeacon'
+      importName: 'log',          // 导入名称，默认为 'log'
+      methodMap: {                // 方法映射，可自定义 console 方法到 log 方法的映射
+        log: 'debug',            // console.log 映射到 log.debug
+        debug: 'debug',          // console.debug 映射到 log.debug
+        info: 'info',            // console.info 映射到 log.info
+        warn: 'warn',            // console.warn 映射到 log.warn
+        error: 'error',          // console.error 映射到 log.error
+        trace: 'trace'           // console.trace 映射到 log.trace
+      }
+    }]
+  }
+};
+```
+
+**默认配置**
+
+如果不提供任何配置项，插件将使用以下默认值：
+
+```javascript
+// 默认配置
+{
+  importSource: 'logbeacon',
+  importName: 'log',
+  methodMap: {
+    log: 'debug',
+    debug: 'debug',
+    info: 'info',
+    warn: 'warn',
+    error: 'error',
+    trace: 'trace'
+  }
+}
+```
+
+#### 3. 自动修复
+
+插件支持自动修复功能，可以通过 `eslint --fix` 命令自动将代码中的 `console.xxx` 调用替换为 `log.xxx`，并自动添加必要的导入语句。
+
+```bash
+npx eslint --fix src/
+```
+
+#### 4. 插件功能
+
+- 自动检测 `console.log`、`console.info`、`console.debug`、`console.warn`、`console.error` 和 `console.trace` 调用
+- 根据配置的映射规则替换为对应的 `log` 方法
+- 自动添加必要的导入语句
+- 支持 ESM 和 CommonJS 两种模块系统
+- 支持检测和替换解构赋值的 console 方法（如 `const { log } = console`）
+
 ## 许可证
 
 MIT
