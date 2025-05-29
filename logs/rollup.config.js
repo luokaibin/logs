@@ -55,6 +55,8 @@ const outputConfig = {
 };
 
 // Rollup 配置导出
+// 使用已有的 copyTypes 插件复制开发工具文件
+
 export default [
   {
     input: 'core/logs.js',
@@ -279,4 +281,23 @@ export default [
     ],
     external: ['eslint']
   },
+  // 开发辅助工具
+  {
+    // 这个配置只是为了触发 copyTypes 插件
+    input: 'browser/log-filter.js',
+    output: {
+      // 这个文件会被生成，但我们主要关注的是 copyTypes 插件的复制功能
+      file: 'dist/dev-tools/log-filter.js',
+      format: 'esm'
+    },
+    plugins: [
+      // 使用 copyTypes 插件复制 log-filter.js 文件
+      copyTypes({
+        targets: [
+          { src: 'browser/log-filter.js', dest: 'dist/dev-tools/log-filter.js' }
+        ]
+      })
+      // 注意：不使用 terser 和 obfuscator，保持开发工具代码的可读性
+    ]
+  }
 ];

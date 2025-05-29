@@ -12,6 +12,7 @@
 - 🔍 **过滤功能**：支持关键词过滤，减少无用日志
 - 🧩 **Service Worker 支持**：通过 Service Worker 处理日志，减轻主线程负担
 - 🔒 **代码保护**：使用代码压缩和混淆技术，保护日志库的安全性
+- 🛠️ **开发辅助工具**：提供日志级别和关键字过滤控制面板，方便开发调试
 
 ## 安装
 
@@ -44,8 +45,8 @@ log.info('这是 info 级别的日志');    // 会被记录
 log.warn('这是 warn 级别的日志');    // 会被记录
 log.error('这是 error 级别的日志');  // 会被记录
 
-// 设置过滤关键词
-log.setKeyWords('ignore');  // 过滤掉以 'ignore' 开头的日志
+// 设置过滤关键词（简单的字符串前缀过滤）
+log.setKeyWords('login');  // 仅显示以 'login' 开头的日志
 
 // 记录带有上下文信息的日志
 log.info('用户操作', {
@@ -54,6 +55,19 @@ log.info('用户操作', {
   component: 'button',
   timestamp: Date.now()
 });
+
+/**
+ * 关于 setKeyWords 的说明：
+ * 
+ * 1. 这是一个简单的日志过滤机制，仅检查日志的第一个参数
+ * 2. 过滤条件：日志的第一个参数必须是字符串，且以设置的关键字开头
+ * 3. 过滤设置保存在 localStorage 中，页面刷新后依然有效
+ * 4. 限制：
+ *    - 只能过滤第一个参数为字符串的日志
+ *    - 只能按前缀匹配，不支持正则或其他复杂匹配
+ *    - 不适用于第一个参数为对象、数组等非字符串类型的日志
+ * 5. 开发环境中，建议使用提供的日志过滤控制面板来设置过滤条件
+ */
 ```
 
 #### 2. 集成 Service Worker
@@ -431,6 +445,91 @@ npx eslint --fix src/
 - 自动添加必要的导入语句
 - 支持 ESM 和 CommonJS 两种模块系统
 - 支持检测和替换解构赋值的 console 方法（如 `const { log } = console`）
+
+## 开发辅助工具
+
+为了方便开发调试，我们提供了一个日志过滤工具，可以在开发环境中使用：
+
+### 使用方法
+
+#### 1. 复制文件
+
+从 `dist/dev-tools` 目录中复制 `log-filter.js` 到您项目的公共目录下的 `beacon` 文件夹中（与 `beacon.js` 和 `beacon-sw.js` 放在同一目录）。
+
+```
+项目目录
+└── public/
+    └── beacon/
+        ├── beacon.js         # 从 dist/sls 或 dist/loki 复制
+        ├── beacon-sw.js      # 从 dist/sls 或 dist/loki 复制
+        └── log-filter.js     # 从 dist/dev-tools 复制
+```
+
+#### 2. 在页面中引入脚本
+
+```html
+<!-- 仅在开发环境中引入 -->
+<script src="/beacon/log-filter.js"></script>
+```
+
+或者在 Next.js 等框架中，您可以有条件地引入：
+
+```jsx
+// 在 Next.js 的 layout.jsx 或其他布局文件中
+export default function RootLayout({ children }) {
+  const isDev = process.env.NODE_ENV === 'development';
+  
+  return (
+    <html lang="zh-CN">
+      <body>
+        {children}
+        <script src="/beacon/beacon.js"></script>
+        {isDev && <script src="/beacon/log-filter.js"></script>}
+      </body>
+    </html>
+  );
+}
+```
+
+#### 3. 功能说明
+
+该工具提供了一个浮动控制面板，允许您在运行时：
+
+- **调整日志级别**：选择 trace、debug、info、warn、error 或 silent 级别
+- **设置关键字过滤**：输入关键字，日志如果以关键字开头则显示，否则不显示
+- **清除过滤设置**：一键清除当前的过滤关键字
+
+所有设置都会保存在浏览器的 localStorage 中，刷新页面后依然有效。
+
+##### 关键字过滤机制说明
+
+关键字过滤是一个简单实用的开发辅助功能，它的工作原理如下：
+
+1. **过滤机制**：只检查日志的第一个参数，如果是字符串且以设置的关键字开头，则显示该日志
+2. **存储方式**：关键字设置保存在 localStorage 的 `_logFilterKeyWords` 键中
+3. **使用场景**：当您需要关注特定模块或功能的日志时，可以为这些日志添加统一前缀，然后设置该前缀作为过滤关键字
+
+**限制**：
+
+- 只能过滤第一个参数为字符串的日志
+- 只能按前缀匹配，不支持正则或其他复杂匹配
+- 不适用于第一个参数为对象、数组等非字符串类型的日志
+
+**最佳实践**：
+
+为了更好地利用这一功能，建议在代码中为相关模块的日志添加统一前缀，例如：
+
+```javascript
+// 用户模块日志
+ log.info('user: 用户登录成功', { userId: '12345' });
+
+// 支付模块日志
+ log.info('payment: 支付请求发送', { orderId: '67890' });
+```
+
+这样在开发调试时，可以通过设置关键字为 `user:` 或 `payment:` 来只显示特定模块的日志。
+
+> **注意**：该工具仅在开发环境（localhost 或 127.0.0.1）中显示控制面板，生产环境中不会显示。
 
 ## 许可证
 
