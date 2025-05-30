@@ -106,8 +106,7 @@ export const createLogClient = (endpoint, accessKeyId, accessKeySecret, projectN
    * @returns {Promise<Object>} - 响应结果
    */
   return async function sendLogs(payload) {
-    // const body = gunzipSync(payload);
-    const body = payload;
+    const body = gunzipSync(payload);
     // 构建完整的请求头
     const headers = {
       'content-type': 'application/x-protobuf',
