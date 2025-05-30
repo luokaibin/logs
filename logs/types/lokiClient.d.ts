@@ -18,6 +18,6 @@ export function createLogClient(
 /**
  * 发送序列化后的日志数据的函数
  * @param payload - 已经序列化的日志数据
- * @returns 响应结果，包含 HTTP 响应对象
+ * @returns HTTP 响应对象
  */
 export type SendLogsFunction = (payload: Uint8Array) => Promise<Response>;

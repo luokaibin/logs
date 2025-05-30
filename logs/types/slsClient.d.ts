@@ -22,6 +22,6 @@ export function createLogClient(
 /**
  * 发送序列化后的日志数据的函数
  * @param payload - 已经序列化的日志数据
- * @returns 响应状态码，成功时返回HTTP状态码，失败时返回-1
+ * @returns HTTP 响应对象
  */
-export type SendLogsFunction = (payload: Uint8Array) => Promise<number>;
+export type SendLogsFunction = (payload: Uint8Array) => Promise<Response>;

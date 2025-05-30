@@ -106,38 +106,35 @@ export const createLogClient = (endpoint, accessKeyId, accessKeySecret, projectN
    * @returns {Promise<Object>} - 响应结果
    */
   return async function sendLogs(payload) {
-    try {
-      const body = gunzipSync(payload);
-      // 构建完整的请求头
-      const headers = {
-        'content-type': 'application/x-protobuf',
-        'date': new Date().toUTCString(),
-        'x-log-apiversion': '0.6.0',
-        'x-log-signaturemethod': 'hmac-sha1',
-        'x-log-bodyrawsize': body.length.toString(),
-        'content-length': body.length.toString(),
-        'content-md5': crypto.createHash('md5').update(body).digest('hex').toUpperCase(),
-      };
-      
-      // 构建请求路径
-      const path = `/logstores/${logstoreName}/shards/lb`;
-      
-      // 生成签名并添加到请求头
-      const signature = sign('POST', path, {}, headers, credentials);
-      headers['authorization'] = signature;
-      
-      // 构建完整的请求 URL
-      const url = `http://${projectName}.${endpoint}${path}`;
-      
-      // 发送请求
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: body
-      });
-      return response.status;
-    } catch (err) {
-      return -1;
-    }
+    // const body = gunzipSync(payload);
+    const body = payload;
+    // 构建完整的请求头
+    const headers = {
+      'content-type': 'application/x-protobuf',
+      'date': new Date().toUTCString(),
+      'x-log-apiversion': '0.6.0',
+      'x-log-signaturemethod': 'hmac-sha1',
+      'x-log-bodyrawsize': body.length.toString(),
+      'content-length': body.length.toString(),
+      'content-md5': crypto.createHash('md5').update(body).digest('hex').toUpperCase(),
+    };
+    
+    // 构建请求路径
+    const path = `/logstores/${logstoreName}/shards/lb`;
+    
+    // 生成签名并添加到请求头
+    const signature = sign('POST', path, {}, headers, credentials);
+    headers['authorization'] = signature;
+    
+    // 构建完整的请求 URL
+    const url = `http://${projectName}.${endpoint}${path}`;
+    
+    // 发送请求
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: body
+    });
+    return response;
   };
 };
