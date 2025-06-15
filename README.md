@@ -47,14 +47,6 @@ log.error('这是 error 级别的日志');  // 会被记录
 // 设置过滤关键词（简单的字符串前缀过滤）
 log.setKeyWords('login');  // 仅显示以 'login' 开头的日志
 
-// 记录带有上下文信息的日志
-log.info('用户操作', {
-  userId: '12345',
-  action: 'click',
-  component: 'button',
-  timestamp: Date.now()
-});
-
 /**
  * 关于 setKeyWords 的说明：
  * 
@@ -67,6 +59,14 @@ log.info('用户操作', {
  *    - 不适用于第一个参数为对象、数组等非字符串类型的日志
  * 5. 开发环境中，建议使用提供的日志过滤控制面板来设置过滤条件
  */
+
+// 记录带有上下文信息的日志
+log.info('用户操作', {
+  userId: '12345',
+  action: 'click',
+  component: 'button',
+  timestamp: Date.now()
+});
 ```
 
 #### 2. 集成 Service Worker
