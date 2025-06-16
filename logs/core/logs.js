@@ -41,4 +41,13 @@ const log = new Proxy(loglevel, {
   }
 });
 
+
+
+
+if (typeof window === 'undefined') {
+  let logLevel = typeof process !== 'undefined' && process.env && process.env.LOGS_LEVEL;
+  logLevel = logLevel || loglevel.levels.TRACE;
+  loglevel.setLevel(logLevel);
+}
+
 export default log;
