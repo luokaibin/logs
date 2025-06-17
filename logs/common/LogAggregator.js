@@ -248,7 +248,6 @@ export class LogAggregator {
         break;
       case 'page-load':
       case 'page-visible':
-        this.reset();
         break;
       case 'page-unload':
       case 'page-hidden':
