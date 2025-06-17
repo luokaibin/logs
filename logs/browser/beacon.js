@@ -28,24 +28,29 @@ export const generateLog = (logEncoder) => {
 
       // 注册 Service Worker（以 module 方式）
       window.addEventListener('load', function() {
+        sendLog('trace', ['[logbeacon] page load']);
         // 指定 Service Worker 的路径和作用域
         navigator.serviceWorker.register('/beacon/beacon-sw.js', { 
           type: 'module',
           scope: '/beacon/' // 明确指定作用域
         }).finally(() => {
+          sendLog('trace', ['[logbeacon] Service Worker registered successfully']);
           sendSWEvent({ type: 'page-load' });
         });
 
         // 页面卸载事件
         window.addEventListener('beforeunload', function() {
+          sendLog('trace', ['[logbeacon] page unload']);
           sendSWEvent({ type: 'page-unload' });
         });
 
         // 前后台切换事件
         document.addEventListener('visibilitychange', function() {
           if (document.visibilityState === 'hidden') {
+            sendLog('trace', ['[logbeacon] page hidden']);
             sendSWEvent({ type: 'page-hidden' });
           } else if (document.visibilityState === 'visible') {
+            sendLog('trace', ['[logbeacon] page visible']);
             sendSWEvent({ type: 'page-visible' });
           }
         });
