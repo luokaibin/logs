@@ -79,7 +79,8 @@ export function getLogExtraInfo() {
     userAgent: window.navigator.userAgent,
     screen: serializeSingleValue({ width: window.screen.width, height: window.screen.height }),
     window: serializeSingleValue({ width: window.innerWidth, height: window.innerHeight }),
-    url: window.location.href
+    url: window.location.href,
+    referrer: document.referrer,
   };
   return base;
 }
