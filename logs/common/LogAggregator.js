@@ -60,6 +60,20 @@ export class LogAggregator {
      * @private
      */
     this._logBuffer = [];
+
+    /**
+     * 日志摘要缓存，用于去重
+     * @type {Map<string, number>}
+     * @private
+     */
+    this._logDigestCache = new Map();
+
+    /**
+     * 重复日志去重时间窗口（毫秒）
+     * @type {number}
+     * @private
+     */
+    this._dedupInterval = 2000;
     
     /**
      * 当前缓冲区累计字节数
@@ -125,6 +139,18 @@ export class LogAggregator {
    * @returns {Promise<void>}
    */
   async addLog(logItem) {
+    if (!logItem.content) return;
+    const digest = await this._getDigest(logItem.content);
+    const lastTime = this._logDigestCache.get(digest);
+
+    if (lastTime) {
+      // 时间窗口内重复，丢弃
+      if (logItem.time - lastTime <= this._dedupInterval) return;
+    }
+
+    // 更新摘要时间或添加新摘要
+    this._logDigestCache.set(digest, logItem.time);
+
     this._logBuffer.push(logItem);
     
     // 增量计算本条日志字节数
@@ -218,6 +244,7 @@ export class LogAggregator {
     this._logBuffer = [];
     this._logBufferBytes = 0;
     this._lastSendTs = Date.now();
+    this._logDigestCache.clear();
   }
   
   /**
@@ -241,6 +268,21 @@ export class LogAggregator {
    * @param {"log"|"page-load"|"page-visible"|"page-unload"|"page-hidden"} event.type - 事件类型
    * @param {any} event.payload - 事件负载
    */
+  /**
+   * 计算字符串的SHA-256摘要
+   * @param {string} str - 输入字符串
+   * @returns {Promise<string>} - 摘要的十六进制字符串
+   * @private
+   */
+  async _getDigest(str) {
+    const data = new TextEncoder().encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    // 将ArrayBuffer转换为十六进制字符串
+    return Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
   handleEvent(event) {
     switch (event.type) {
       case 'log':
