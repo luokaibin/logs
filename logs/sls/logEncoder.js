@@ -76,13 +76,22 @@ export default function logEncoder(logs) {
       // 创建日志内容
       const logPayload = {
         Time: Math.floor(time / 1000),
-        Contents: Object.entries(rest).map(([Key, Value]) => {
-          // 将值转换为字符串
-          return { 
-            Key, 
-            Value: typeof Value === 'string' ? Value : JSON.stringify(Value) 
-          };
-        })
+        Contents: Object.entries(rest).reduce((acc, [Key, Value]) => {
+          // 卫语句：Key 必须有效，Value 不能是 null 或 undefined
+          if (!Key || Value === null || Value === undefined) {
+            return acc;
+          }
+
+          const finalValue = typeof Value === 'string' ? Value : JSON.stringify(Value);
+
+          // 过滤转换后为空或纯空格的字符串
+          if (!finalValue.trim()) {
+            return acc;
+          }
+
+          acc.push({ Key, Value: finalValue });
+          return acc;
+        }, [])
       };
       
       return logPayload;
