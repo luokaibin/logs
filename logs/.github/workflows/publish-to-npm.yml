@@ -1,0 +1,44 @@
+name: Publish to npm
+
+# 当在 GitHub 上发布一个新的 Release 时，此工作流会自动运行
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. 拉取代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 安装 pnpm
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10 # 你可以指定 pnpm 版本
+
+      # 3. 设置 Node.js 环境，并启用 pnpm 缓存
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '23.x'
+          registry-url: 'https://registry.npmjs.org/'
+          cache: 'pnpm'
+
+      # 4. 安装依赖项
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 5. 执行构建脚本 (在 logs 目录内)
+      - name: Build project
+        run: pnpm run build
+        working-directory: ./logs
+
+      # 6. 发布到 npm (在 logs 目录内)
+      - name: Publish to npm
+        run: pnpm publish --access public
+        working-directory: ./logs
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
