@@ -73,8 +73,7 @@ function serializeSingleValue(
   
   // 处理函数
   if (type === 'function') {
-    const fnStr = value.toString();
-    return `Function: ${value.name || 'anonymous'} ${fnStr.slice(0, 100)}${fnStr.length > 100 ? '...' : ''}`;
+    return `[Function: ${value.name || 'anonymous'}]`;
   }
 
   // --- 对象类型处理开始 ---
