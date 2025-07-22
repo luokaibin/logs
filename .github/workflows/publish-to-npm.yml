@@ -6,8 +6,10 @@ on:
     types: [published]
 
 jobs:
-  publish:
+  publish-to-npm:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       # 1. 拉取代码
       - name: Checkout repository
@@ -36,9 +38,22 @@ jobs:
         run: pnpm run build
         working-directory: ./logs
 
-      # 6. 发布到 npm (在 logs 目录内)
+      # 6. 提交并推送构建产物
+      - name: Commit and push build artifacts
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: build and commit artifacts for release"
+            git push
+          fi
+
+      # 7. 发布到 npm (在 logs 目录内)
       - name: Publish to npm
-        run: pnpm publish --access public
+        run: pnpm publish --no-git-checks --access public
         working-directory: ./logs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
