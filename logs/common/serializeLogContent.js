@@ -1,8 +1,17 @@
 // 默认的数组采样规则
 const ARRAY_SAMPLING_CONFIG = {
-  threshold: 30,
-  primitive: { head: 20, tail: 10, middle: 5 },
-  complex: { head: 5, tail: 3, middle: 2 },
+  primitive: {
+    threshold: 20, // 对简单数组保持宽松的阈值
+    head: 10,      // 保留足够的上下文
+    tail: 4,
+    middle: 3
+  },
+  complex: {
+    threshold: 10, // 对复杂数组使用严格的阈值
+    head: 5,       // 采用更保守的采样数
+    tail: 3,
+    middle: 2
+  },
 };
 
 // 序列化后日志字符串的最大长度
@@ -17,14 +26,7 @@ function serializeLogContent(content) {
   const serializableObject = serializeSingleValue(content);
 
   try {
-    let result;
-    if (Array.isArray(serializableObject)) {
-      result = serializableObject.map(item => 
-        (typeof item === 'object' && item !== null) ? JSON.stringify(item) : String(item)
-      ).join(' ');
-    } else {
-      result = JSON.stringify(serializableObject);
-    }
+    const result = JSON.stringify(serializableObject);
 
     // 截断过长的结果
     return result.length > MAX_LOG_LENGTH ? result.slice(0, MAX_LOG_LENGTH) + '...' : result;
@@ -119,39 +121,38 @@ function serializeSingleValue(
 
   // 处理数组 (包括采样逻辑)
   if (Array.isArray(value)) {
-    if (value.length > ARRAY_SAMPLING_CONFIG.threshold) {
-      const isComplex = value.length > 0 && typeof value[0] === 'object' && value[0] !== null;
-      const rules = isComplex ? ARRAY_SAMPLING_CONFIG.complex : ARRAY_SAMPLING_CONFIG.primitive;
-      
-      const sampledResult = { _t: 'arr', _l: value.length, _e: {} };
-      const indices = new Set();
+    const isComplex = value.length > 0 && typeof value[0] === 'object' && value[0] !== null;
+    const rules = isComplex ? ARRAY_SAMPLING_CONFIG.complex : ARRAY_SAMPLING_CONFIG.primitive;
 
-      // Head
-      for (let i = 0; i < rules.head && i < value.length; i++) {
-        indices.add(i);
-      }
-      // Tail
-      for (let i = 0; i < rules.tail && value.length - 1 - i >= 0; i++) {
-        indices.add(value.length - 1 - i);
-      }
-      // Middle
-      const midStart = Math.floor(value.length / 2 - rules.middle / 2);
-      for (let i = 0; i < rules.middle && midStart + i < value.length; i++) {
-        indices.add(midStart + i);
-      }
-
-      const sortedIndices = Array.from(indices).sort((a, b) => a - b);
-      for (const index of sortedIndices) {
-        sampledResult._e[index] = serializeSingleValue(value[index], options, currentDepth + 1, seen);
-      }
-      return sampledResult;
-    } else {
-      const arr = [];
-      for (const item of value) {
-        arr.push(serializeSingleValue(item, options, currentDepth + 1, seen));
-      }
-      return arr;
+    // 卫语句：如果未达到采样阈值，则正常处理并提前返回
+    if (value.length <= rules.threshold) {
+      return value.map(item => serializeSingleValue(item, options, currentDepth + 1, seen));
     }
+
+    // --- 采样逻辑开始 ---
+    const sampledResult = { _t: 'arr', _l: value.length, _e: {} };
+    const indices = new Set();
+
+    // Head
+    for (let i = 0; i < rules.head && i < value.length; i++) {
+      indices.add(i);
+    }
+    // Tail
+    for (let i = 0; i < rules.tail && value.length - 1 - i >= 0; i++) {
+      indices.add(value.length - 1 - i);
+    }
+    // Middle
+    const midStart = Math.floor(value.length / 2 - rules.middle / 2);
+    for (let i = 0; i < rules.middle && midStart + i < value.length; i++) {
+      indices.add(midStart + i);
+    }
+
+    const sortedIndices = Array.from(indices).sort((a, b) => a - b);
+    for (const index of sortedIndices) {
+      sampledResult._e[index] = serializeSingleValue(value[index], options, currentDepth + 1, seen);
+    }
+
+    return sampledResult;
   }
   
   // 处理 DOM 元素 (浏览器环境)
