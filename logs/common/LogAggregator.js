@@ -211,6 +211,7 @@ export class LogAggregator {
     await this._enrichLog();
 
     const payload = this._logEncoder(this._logBuffer);
+    if (!payload) return;
     const body = this._compressLogs(payload);
     try {
       if (navigator.sendBeacon) {

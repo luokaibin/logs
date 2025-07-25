@@ -59,7 +59,7 @@ class LogContext {
 /**
  * 将日志数组序列化为 protobuf 格式
  * @param {Array} logs - 日志数组
- * @returns {Uint8Array} - 序列化后的二进制数据
+ * @returns {Uint8Array|undefined} - 序列化后的二进制数据
  */
 export default function logEncoder(logs) {
   if (!Array.isArray(logs)) {
@@ -95,7 +95,7 @@ export default function logEncoder(logs) {
       };
       
       return logPayload;
-    }),
+    }).filter(item => !!item?.Contents?.length && !!item?.Time),
     LogTags: [
       {
         Key: "__pack_id__",
@@ -103,6 +103,7 @@ export default function logEncoder(logs) {
       }
     ]
   };
+  if (!payload.Logs?.length) return;
   
   // 创建并编码日志组
   const pbf = new Pbf();
