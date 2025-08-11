@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+message LogBatch {
+  repeated bytes logs = 1; // 预编码的 LogItem 列表
+}
+
+message LogItem {
+  int64 time = 1;
+  string level = 2;
+  string content = 3;
+  string clientUuid = 4;
+  string userAgent = 5;
+  string screen = 6;
+  string window = 7;
+  string url = 8;
+  string ip = 9;
+  string region = 10;
+  string referrer = 11;
+}

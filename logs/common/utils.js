@@ -7,8 +7,8 @@ import { serializeLogContent, serializeSingleValue } from "./serializeLogContent
  * @returns {boolean}
  */
 export function isSameDay(ts1, ts2) {
-  const d1 = new Date(ts1);
-  const d2 = new Date(ts2);
+  const d1 = new Date(Number(ts1));
+  const d2 = new Date(Number(ts2));
   return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
 }
 
@@ -77,8 +77,8 @@ export function getLogExtraInfo() {
     time: Date.now(),
     clientUuid: getOrCreateUUID(),
     userAgent: window.navigator.userAgent,
-    screen: serializeSingleValue({ width: window.screen.width, height: window.screen.height }),
-    window: serializeSingleValue({ width: window.innerWidth, height: window.innerHeight }),
+    screen: JSON.stringify(serializeSingleValue({ width: window.screen.width, height: window.screen.height })),
+    window: JSON.stringify(serializeSingleValue({ width: window.innerWidth, height: window.innerHeight })),
     url: window.location.href,
     referrer: document.referrer,
   };
@@ -99,7 +99,6 @@ export async function getServiceWorker(scope = '/beacon/') {
     const swRegistration = registrations.find(reg => 
       reg.scope.includes(scope)
     );
-    
     if (!swRegistration) return null;
     
     // Service Worker 已经激活，直接返回
@@ -137,6 +136,23 @@ export async function getServiceWorker(scope = '/beacon/') {
   }
 }
 
+export async function sendEvent(msg) {
+  try {
+    // 获取指定作用域的 Service Worker
+    const serviceWorker = await getServiceWorker('/beacon/');
+    if (!serviceWorker) {
+      const event = new CustomEvent('sendLog', {
+        detail: msg
+      });
+      window.dispatchEvent(event)
+    } else {
+      serviceWorker.postMessage(msg);
+    }
+  } catch (e) {
+    console.error('Failed to send logs to Service Worker:', e);
+  }
+}
+
 /**
  * 发送日志到service worker
  * @param {"trace"|"debug"|"info"|"warn"|"error"} level - 日志等级
@@ -158,20 +174,7 @@ export async function sendLog(level, logs) {
     payload: base
   };
 
-  try {
-    // 获取指定作用域的 Service Worker
-    const serviceWorker = await getServiceWorker('/beacon/');
-    if (!serviceWorker) {
-      const event = new CustomEvent('sendLog', {
-        detail: msg
-      });
-      window.dispatchEvent(event)
-    } else {
-      serviceWorker.postMessage(msg);
-    }
-  } catch (e) {
-    console.error('Failed to send logs to Service Worker:', e);
-  }
+  sendEvent(msg);  
 }
 
 export const logFilter = {

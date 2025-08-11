@@ -3,7 +3,7 @@
  * @param {Array} logs - 日志数组
  * @returns {Uint8Array|undefined} - 序列化后的 Loki 格式数据
  */
-export default function logEncoder(logs) {
+export default async function logEncoder(logs) {
     // 这里每条日志单独作为一条 value，上报到同一个 stream（可根据需要自定义标签）
     const streamLabels = {
       host: location.hostname,

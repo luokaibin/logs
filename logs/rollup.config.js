@@ -1,7 +1,7 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import terser from '@rollup/plugin-terser';
-import obfuscator from 'rollup-plugin-obfuscator';
+// import obfuscator from 'rollup-plugin-obfuscator';
 import copyTypes from './rollup-plugin-copy-types.js';
 
 /**
@@ -33,17 +33,17 @@ const commonjsPlugin = commonjs();
 const terserPlugin = terser(terserOptions);
 
 // 混淆器配置选项
-const obfuscatorOptions = {
-  global: false, // 不进行全局混淆，只混淆当前文件
-  options: {
-    compact: true,               // 压缩代码，移除空白字符和注释
-    controlFlowFlattening: true, // 控制流扁平化，使代码逻辑更难理解
-    deadCodeInjection: false,    // 不注入死代码，避免增加文件体积
-    stringArray: true,           // 将字符串提取到数组中，通过索引引用
-    stringArrayEncoding: ['rc4'], // 使用 RC4 算法加密字符串数组
-    stringArrayThreshold: 0.75   // 75% 的字符串会被移到字符串数组中
-  } 
-};
+// const obfuscatorOptions = {
+//   global: false, // 不进行全局混淆，只混淆当前文件
+//   options: {
+//     compact: true,               // 压缩代码，移除空白字符和注释
+//     controlFlowFlattening: true, // 控制流扁平化，使代码逻辑更难理解
+//     deadCodeInjection: false,    // 不注入死代码，避免增加文件体积
+//     stringArray: true,           // 将字符串提取到数组中，通过索引引用
+//     stringArrayEncoding: ['rc4'], // 使用 RC4 算法加密字符串数组
+//     stringArrayThreshold: 0.75   // 75% 的字符串会被移到字符串数组中
+//   } 
+// };
 
 // 混淆器插件
 // const obfuscatorPlugin = obfuscator(obfuscatorOptions);
@@ -102,7 +102,7 @@ export default [
       resolvePlugin,
       commonjsPlugin,
       terserPlugin,
-      obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
+      // obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
     ],
     // Tree Shaking 优化配置，移除未使用的代码
     treeshake: {
@@ -126,7 +126,7 @@ export default [
       resolvePlugin,
       commonjsPlugin,
       terserPlugin,
-      obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
+      // obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
     ],
     // Tree Shaking 优化配置
     treeshake: {
@@ -182,7 +182,7 @@ export default [
       resolvePlugin,
       commonjsPlugin,
       terserPlugin,
-      obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
+      // obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
     ],
     // Tree Shaking 优化配置，移除未使用的代码
     treeshake: {
@@ -206,7 +206,7 @@ export default [
       resolvePlugin,
       commonjsPlugin,
       terserPlugin,
-      obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
+      // obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
     ],
     // Tree Shaking 优化配置
     treeshake: {

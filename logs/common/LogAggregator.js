@@ -3,10 +3,10 @@
  * 负责日志的缓存、处理和发送
  */
 
-import { UAParser } from 'ua-parser-js';
-import { isSameDay, fetchPublicIPAndRegion } from './utils.js';
-import {serializeSingleValue} from './serializeLogContent.js'
+import { META_KEYS } from './constants.js';
+import { isSameDay } from './utils.js';
 import {gzipSync} from "fflate"
+import {LogProcessor} from './LogProcessor.js';
 
 /**
  * @typedef {Object} UserAgentInfo
@@ -24,6 +24,7 @@ import {gzipSync} from "fflate"
  * @property {"trace"|"debug"|"info"|"warn"|"error"} level - 日志等级
  * @property {string} content - 日志内容
  * @property {string} clientUuid - 客户端唯一ID
+ * @property {string} referrer - 当前页面的 referrer
  * @property {UserAgentInfo} userAgent - 解析后的 userAgent 信息
  * @property {{width: number, height: number}} screen - 屏幕宽高
  * @property {{width: number, height: number}} window - 窗口宽高
@@ -34,60 +35,41 @@ import {gzipSync} from "fflate"
 
 /**
  * 日志聚合器类
- * 负责日志的缓存、处理和发送
+ * 继承自LogProcessor，负责日志的批量聚合、处理和发送
  */
-export class LogAggregator {
+export class LogAggregator extends LogProcessor {
   /**
    * 创建日志聚合器实例
    * @param {Object} options - 配置选项
    * @param {(logs: LogItem[]) => Uint8Array} options.logEncoder - 日志编码器
    * @param {number} [options.flushInterval=300000] - 日志自动发送间隔（毫秒），默认5分钟
    * @param {number} [options.flushSize=3145728] - 日志缓冲区大小上限（字节），默认3MB
+   * @param {number} [options.dedupInterval=2000] - 重复日志去重时间窗口（毫秒）
    */
   constructor(options = {}) {
+    super(options);
     if (!options.logEncoder) {
       throw new Error('logEncoder is required!');
     }
     /**
      * 日志编码器
-     * @type {(logs: LogItem[]) => Uint8Array}
+     * @type {(logs: LogItem[], logContext: string) => Promise<Uint8Array>}
      * @private
      */
     this._logEncoder = options.logEncoder;
     /**
-     * 日志缓冲区，存储待发送的日志对象
-     * @type {LogItem[]}
+     * 日志缓冲区，存储待发送的日志对象 null 说明是冷启动
+     * @type {LogItem[]|null}
      * @private
      */
-    this._logBuffer = [];
-
-    /**
-     * 日志摘要缓存，用于去重
-     * @type {Map<string, number>}
-     * @private
-     */
-    this._logDigestCache = new Map();
-
-    /**
-     * 重复日志去重时间窗口（毫秒）
-     * @type {number}
-     * @private
-     */
-    this._dedupInterval = 2000;
+    this._logBuffer = null;
     
     /**
      * 当前缓冲区累计字节数
-     * @type {number}
+     * @type {number|null}
      * @private
      */
-    this._logBufferBytes = 0;
-    
-    /**
-     * 上次发送日志的时间戳
-     * @type {number}
-     * @private
-     */
-    this._lastSendTs = Date.now();
+    this._logBufferBytes = null;
     
     /**
      * 日志自动发送间隔（毫秒）
@@ -101,103 +83,151 @@ export class LogAggregator {
      * @type {number}
      * @private
      */
-    this._flushSize = options.flushSize || 3 * 1024 * 1024; // 默认3MB
-    
+    this._flushSize = options.flushSize || 2 * 1024 * 1024; // 默认2MB
+
     /**
-     * 解析后的userAgent对象
-     * @type {UserAgentInfo|null}
-     * @private
-     */
-    this._userAgent = null;
-    
-    /**
-     * 当前公网出口IP
+     * 日志上下文 - 用于标识日志批次，格式为 `${prefix}-${logGroupId}` 禁止直接使用
      * @type {string|null}
      * @private
      */
-    this._currentIp = null;
+    this._logContext = null;
+  }
+  
+  /** 
+   * 生成日志上下文前缀
+   * @private
+   * @returns {string}
+   */
+  static _generateLogContextPrefix() {
+    let uuid;
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        uuid = crypto.randomUUID();
+      } else {
+        // 生成 16 字节的随机十六进制字符串
+        const hexChars = '0123456789ABCDEF';
+        uuid = '';
+        for (let i = 0; i < 32; i++) {
+          uuid += hexChars[Math.floor(Math.random() * 16)];
+        }
+      }
+      return uuid.replace(/-/g, '').toUpperCase().substring(0, 16);
+  }
+  /**
+   * 生成日志上下文
+   * @private
+   * @returns {Promise<string>}
+   */
+  async _generateLogContext() {
+    let logContext = this._logContext;
+    let prefix = logContext?.split('-')?.[0];
+    let logGroupId = logContext?.split('-')?.[1];
+    if (logContext && prefix && logGroupId) {
+      const newLogGroupId = parseInt(logGroupId, 16) + 1;
+      this._logContext = `${prefix}-${newLogGroupId.toString(16).toUpperCase()}`;
+      this.setMeta(META_KEYS.LOG_CONTEXT, this._logContext);
+      return this._logContext;
+    }
+    let [dbLogContext, lastUpdateTime] = await Promise.all([
+      this.getMeta(META_KEYS.LOG_CONTEXT),
+      this.getMeta(META_KEYS.LAST_UPDATE_TIME),
+    ]);
+
+    prefix = dbLogContext?.split('-')?.[0];
+    logGroupId = dbLogContext?.split('-')?.[1];
+    const now = Date.now();
+    if (prefix && logGroupId && lastUpdateTime && isSameDay(lastUpdateTime, now)) {
+
+      const newLogGroupId = parseInt(logGroupId, 16) + 1;
+      this._logContext = `${prefix}-${newLogGroupId.toString(16).toUpperCase()}`;
+      this.setMeta(META_KEYS.LOG_CONTEXT, this._logContext);
+      return this._logContext;
+    }
+
+    prefix = LogAggregator._generateLogContextPrefix();
+    logGroupId = 1;
+    this._logContext = `${prefix}-${logGroupId.toString(16).toUpperCase()}`;
+    this.setMeta(META_KEYS.LOG_CONTEXT, this._logContext);
+    return this._logContext;
+  }
+  /**
+   * 获取日志缓冲区
+   * @private
+   * @returns {Promise<LogItem[]>}
+   */
+  async _getLogBuffer() {
+    if (this._logBuffer) {
+      return this._logBuffer;
+    }
+    const logs = await this.getAllLogs();
+    if (!logs || logs.length === 0) {
+      this._logBufferBytes = 0;
+      this._logBuffer = [];
+      return this._logBuffer;
+    };
+    this._logBufferBytes = 0;
+    this._logBuffer = logs.map(log => {
+      this._logBufferBytes += log.length;
+      return this.decodeLog(log);
+    });
+    return this._logBuffer;
+  }
+  /**
+   * 添加日志到缓冲区
+   * @private
+   * @param {LogItem} logItem - 日志项
+   * @returns {Promise<{logBufferBytes: number, log: LogItem}|null>}
+   */
+  async _addLogToBuffer(logItem) {
+    const logBuffer = await this._getLogBuffer();
+    const res = await this.insertLog(logItem);
+    if (!res) return null;
+    const {log, size} = res;
+    logBuffer.push(log);
     
-    /**
-     * 当前公网出口IP所在地区
-     * @type {string|null}
-     * @private
-     */
-    this._currentRegion = null;
-    
-    /**
-     * 上次获取IP的时间戳（毫秒）
-     * @type {number}
-     * @private
-     */
-    this._lastIpFetchTime = 0;
-    
+    this._logBufferBytes += size;
+    return {
+      logBufferBytes: this._logBufferBytes,
+      log
+    }
+  }
+  /**
+   * 清空日志缓冲区 和 缓存区大小记录
+   * @private
+   * @returns {Promise<void>}
+   */
+  async _clearLogBuffer() {
+    this._logBuffer = [];
+    this._logBufferBytes = 0;
+    await this.clearLogs();
+  }
+
+  /** 
+   * 获取最早的一条日志
+   * @returns {Promise<LogItem|null>} - 最早的一条日志，如果不存在则返回 null
+   */
+  async getFirstLog() {
+    const logs = await this._getLogBuffer();
+    return logs[0];
   }
   
   /**
-   * 添加日志到缓冲区
+   * 添加日志到缓冲区并检查是否触发发送
    * @param {LogItem} logItem - 日志项
    * @returns {Promise<void>}
    */
   async addLog(logItem) {
-    if (!logItem.content) return;
-    const digest = await this._getDigest(logItem.content);
-    const lastTime = this._logDigestCache.get(digest);
+    const added = await this._addLogToBuffer(logItem);
+    if (!added) return; // 如果因为去重等原因未添加，则直接返回
 
-    if (lastTime) {
-      // 时间窗口内重复，丢弃
-      if (logItem.time - lastTime <= this._dedupInterval) return;
-    }
+    const firstLog = await this.getFirstLog();
+    if (!firstLog) return; // 缓冲区为空，不处理
 
-    // 更新摘要时间或添加新摘要
-    this._logDigestCache.set(digest, logItem.time);
-
-    this._logBuffer.push(logItem);
-    
-    // 增量计算本条日志字节数
-    const itemBytes = new TextEncoder().encode(JSON.stringify(logItem)).length;
-    this._logBufferBytes += itemBytes;
-    
     // 满足条件时自动发送日志
-    if (this._logBufferBytes >= this._flushSize) {
+    if (added.logBufferBytes >= this._flushSize) {
       await this.flushLogs();
-    } else if (Date.now() - this._lastSendTs > this._flushInterval) {
+    } else if (Date.now() - firstLog.time > this._flushInterval) {
       // 未满足大小条件但超时
       await this.flushLogs();
-    }
-  }
-  
-  /**
-   * 给日志补充信息
-   * @private
-   * @returns {Promise<void>}
-   */
-  async _enrichLog() {
-    // 判断是否需要更新IP（每天只更新一次）
-    const now = Date.now();
-    if (!isSameDay(now, this._lastIpFetchTime)) {
-      const { ip, region } = await fetchPublicIPAndRegion();
-      if (ip) this._currentIp = ip;
-      if (region) this._currentRegion = region;
-      if (ip || region) {
-        this._lastIpFetchTime = now; // IP最后的获取时间
-      }
-    }
-
-    // 二次加工：统一加上解析后的 userAgent 和 IP
-    if (!this._userAgent) {
-      const ua = this._logBuffer[0]?.userAgent;
-      if (ua) {
-        this._userAgent = serializeSingleValue(UAParser(ua));
-      }
-    }
-    
-    // 给日志补充信息
-    if (this._userAgent || this._currentIp || this._currentRegion) {
-      for (const item of this._logBuffer) {
-        if (this._userAgent) item.userAgent = this._userAgent;
-        if (this._currentIp) item.ip = this._currentIp;
-        if (this._currentRegion) item.region = this._currentRegion;
-      }
     }
   }
   
@@ -206,11 +236,10 @@ export class LogAggregator {
    * @returns {Promise<void>}
    */
   async flushLogs() {
-    if (this._logBuffer.length === 0) return;
-    
-    await this._enrichLog();
+    const logBuffer = await this._getLogBuffer();
+    if (!logBuffer || logBuffer.length === 0) return;
 
-    const payload = this._logEncoder(this._logBuffer);
+    const payload = await this._logEncoder(logBuffer);
     if (!payload) return;
     const body = this._compressLogs(payload);
     try {
@@ -223,7 +252,7 @@ export class LogAggregator {
         });
       }
     } finally {
-      this.reset();
+      await this.reset();
     }
   }
   
@@ -241,60 +270,30 @@ export class LogAggregator {
   /**
    * 重置日志聚合器状态
    */
-  reset() {
-    this._logBuffer = [];
-    this._logBufferBytes = 0;
-    this._lastSendTs = Date.now();
-    this._logDigestCache.clear();
+  async reset() {
+    await this._clearLogBuffer();
+    await this._clearLogDigestCache();
   }
   
-  /**
-   * 获取当前缓冲区日志数量
-   * @returns {number} 日志数量
-   */
-  getBufferSize() {
-    return this._logBuffer.length;
-  }
-  
-  /**
-   * 获取当前缓冲区字节数
-   * @returns {number} 字节数
-   */
-  getBufferBytes() {
-    return this._logBufferBytes;
-  }
   /**
    * 分类处理事件
    * @param {Object} event - 事件对象
    * @param {"log"|"page-load"|"page-visible"|"page-unload"|"page-hidden"} event.type - 事件类型
    * @param {any} event.payload - 事件负载
    */
-  /**
-   * 计算字符串的SHA-256摘要
-   * @param {string} str - 输入字符串
-   * @returns {Promise<string>} - 摘要的十六进制字符串
-   * @private
-   */
-  async _getDigest(str) {
-    const data = new TextEncoder().encode(str);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    // 将ArrayBuffer转换为十六进制字符串
-    return Array.from(new Uint8Array(hashBuffer))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
+  
 
-  handleEvent(event) {
+  async handleEvent(event) {
     switch (event.type) {
       case 'log':
-        this.addLog(event.payload);
+        await this.addLog(event.payload);
         break;
       case 'page-load':
       case 'page-visible':
         break;
       case 'page-unload':
       case 'page-hidden':
-        this.flushLogs();
+        await this.flushLogs();
         break;
       default:
         // 非支持类型消息忽略
@@ -305,7 +304,7 @@ export class LogAggregator {
    * 获取单例实例
    * @param {Object} options - 配置选项
    * @param {number} [options.flushInterval=300000] - 日志自动发送间隔（毫秒），默认5分钟
-   * @param {number} [options.flushSize=1048576] - 日志缓冲区大小上限（字节），默认1MB
+   * @param {number} [options.flushSize=2097152] - 日志缓冲区大小上限（字节），默认2MB
    * @returns {LogAggregator} 日志聚合器实例
    */
   static getInstance(options) {
