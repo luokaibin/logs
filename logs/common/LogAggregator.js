@@ -238,8 +238,8 @@ export class LogAggregator extends LogProcessor {
   async flushLogs() {
     const logBuffer = await this._getLogBuffer();
     if (!logBuffer || logBuffer.length === 0) return;
-
-    const payload = await this._logEncoder(logBuffer);
+    const ctxId = await this?._generateLogContext?.();
+    const payload = this._logEncoder(logBuffer, ctxId);
     if (!payload) return;
     const body = this._compressLogs(payload);
     try {
@@ -248,7 +248,8 @@ export class LogAggregator extends LogProcessor {
       } else {
         await fetch('/api/beacon', {
           method: 'POST',
-          body
+          body,
+          keepalive: true,
         });
       }
     } finally {

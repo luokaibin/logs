@@ -4,18 +4,22 @@ import { writeLogGroup } from './sls';
 /**
  * 将日志数组序列化为 protobuf 格式
  * @param {Array} logs - 日志数组
+ * @param {string} ctxId - 日志上下文ID
  * @returns {Uint8Array|undefined} - 序列化后的二进制数据
  */
-export default async function logEncoder(logs) {
+export default function logEncoder(logs, ctxId) {
   if (!Array.isArray(logs)) {
     throw new Error('logs must be array!')
   }
+
+  const LogTags = [];
   
-  const packId = await this?._generateLogContext?.();
-  const pack = packId ? {
-    key: "__pack_id__",
-    value: packId
-  } : undefined;
+  if (ctxId) {
+    LogTags.push({
+      Key: "__pack_id__",
+      Value: ctxId
+    });
+  }
   // 构建日志对象
   const payload = {
     Logs: logs.map(log => {
@@ -44,9 +48,7 @@ export default async function logEncoder(logs) {
       
       return logPayload;
     }).filter(item => !!item?.Contents?.length && !!item?.Time),
-    LogTags: [
-      pack
-    ]
+    LogTags: LogTags
   };
   if (!payload.Logs?.length) return;
   console.log("SLS日志", payload, packId)
