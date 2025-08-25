@@ -119,6 +119,21 @@ export default function RootLayout({ children }) {
 
 > **注意**: 不需要手动注册 Service Worker，beacon.js 会自动处理注册过程。Service Worker 会自动监听页面状态变化、错误事件和未处理的 Promise 异常。
 
+#### 3. (可选) 配置日志上报地址
+
+默认情况下，日志数据会被发送到 `/api/beacon` 接口。您可以通过在引入 `beacon.js` 的 `<script>` 标签上添加 `data-beacon-url` 属性来自定义上报地址。
+
+例如，要将日志发送到 `https://your-custom-endpoint.com/logs`：
+
+```html
+<script 
+  src="/beacon/beacon.js" 
+  data-beacon-url="https://your-custom-endpoint.com/logs"
+></script>
+```
+
+> **重要提示**：服务端需要相应地在您配置的地址上创建接收日志的接口。
+
 ### 服务端使用
 
 服务端负责接收浏览器发送的日志数据，并将其转发到日志服务。

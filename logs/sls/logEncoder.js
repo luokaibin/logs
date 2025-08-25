@@ -51,7 +51,6 @@ export default function logEncoder(logs, ctxId) {
     LogTags: LogTags
   };
   if (!payload.Logs?.length) return;
-  console.log("SLS日志", payload, packId)
   // 创建并编码日志组
   const pbf = new Pbf();
   writeLogGroup(payload, pbf);

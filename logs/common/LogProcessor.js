@@ -29,7 +29,7 @@ export class LogProcessor extends LogStore {
      * @type {number}
      * @private
      */
-    this._dedupInterval = options.dedupInterval || 2000;
+    this._dedupInterval = options.dedupInterval || 3000;
 
     /**
      * 解析后的userAgent对象

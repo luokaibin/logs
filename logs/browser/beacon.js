@@ -1,17 +1,20 @@
-import { getLogExtraInfo } from '../common/utils.js';
+import { getLogExtraInfo, getServiceWorker } from '../common/utils.js';
 import {serializeLogContent} from '../common/serializeLogContent.js';
 import { LogProcessor } from '../common/LogProcessor.js';
 
-export const generateLog = (logEncoder) => {
+export const generateLog = () => {
   function initSWBridge() {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       const logProcessor = new LogProcessor();
-      let serviceWorker;
+      const initInfo = {
+        currentScript: document.currentScript,
+        serviceWorker: null,
+      }
 
       // 发送事件
       const sendSWEvent = (msg) => {
-        if (serviceWorker) {
-          return serviceWorker.postMessage(msg);
+        if (initInfo.serviceWorker) {
+          return initInfo.serviceWorker.postMessage(msg);
         }
         const event = new CustomEvent('sendLog', {
           detail: msg
@@ -31,8 +34,26 @@ export const generateLog = (logEncoder) => {
         navigator.serviceWorker.register('/beacon/beacon-sw.js', {
           type: 'module',
           scope: '/beacon/' // 明确指定作用域
-        }).then((registration) => {
-          serviceWorker = registration.active;
+        }).then(async (registration) => {
+          if (registration.active) {
+            initInfo.serviceWorker = registration.active
+          } else {
+            initInfo.serviceWorker = await getServiceWorker();
+          }
+
+          // 读取 beacon-url 配置并发送
+          if (initInfo.currentScript) {
+            const beaconUrl = initInfo.currentScript.getAttribute('data-beacon-url');
+            if (beaconUrl) {
+              sendSWEvent({
+                type: 'config-update',
+                payload: {
+                  beaconUrl,
+                },
+              });
+            }
+          }
+
           sendSWEvent({ type: 'log', payload: loadLog });
           sendSWEvent({
             type: 'log',

@@ -91,6 +91,13 @@ export class LogAggregator extends LogProcessor {
      * @private
      */
     this._logContext = null;
+
+    /**
+     * 日志上报接口地址
+     * @type {string|null}
+     * @private
+     */
+    this._beaconUrl = null;
   }
   
   /** 
@@ -112,6 +119,46 @@ export class LogAggregator extends LogProcessor {
       }
       return uuid.replace(/-/g, '').toUpperCase().substring(0, 16);
   }
+  /**
+   * 生成日志上下文
+   * @private
+   * @returns {Promise<string>}
+   */
+  /**
+   * 获取 beaconUrl
+   * @private
+   * @returns {Promise<string>}
+   */
+  async _getBeaconUrl() {
+    if (this._beaconUrl) {
+      return this._beaconUrl;
+    }
+    const storedUrl = await this.getMeta(META_KEYS.BEACON_URL);
+    if (storedUrl) {
+      this._beaconUrl = storedUrl;
+      return storedUrl;
+    }
+    return '/api/beacon'; // 默认地址
+  }
+
+  /**
+   * 更新 beaconUrl 配置
+   * @private
+   * @param {string} url - 新的 beaconUrl
+   * @returns {Promise<void>}
+   */
+  async _updateBeaconUrl(url) {
+    if (!url) return;
+    // 直接从实例变量比较，避免一次多余的DB读取
+    if (url !== this._beaconUrl) {
+      const storedUrl = await this.getMeta(META_KEYS.BEACON_URL);
+      if (url !== storedUrl) {
+        this._beaconUrl = url;
+        await this.setMeta(META_KEYS.BEACON_URL, url);
+      }
+    }
+  }
+
   /**
    * 生成日志上下文
    * @private
@@ -242,18 +289,20 @@ export class LogAggregator extends LogProcessor {
     const payload = this._logEncoder(logBuffer, ctxId);
     if (!payload) return;
     const body = this._compressLogs(payload);
+    const beaconUrl = await this._getBeaconUrl();
     try {
       if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/beacon', body);
+        navigator.sendBeacon(beaconUrl, body);
       } else {
-        await fetch('/api/beacon', {
+        await fetch(beaconUrl, {
           method: 'POST',
           body,
           keepalive: true,
         });
       }
-    } finally {
       await this.reset();
+    } catch (e) {
+      console.error('flushLogs error', e);
     }
   }
   
@@ -288,6 +337,11 @@ export class LogAggregator extends LogProcessor {
     switch (event.type) {
       case 'log':
         await this.addLog(event.payload);
+        break;
+      case 'config-update':
+        if (event.payload && event.payload.beaconUrl) {
+          await this._updateBeaconUrl(event.payload.beaconUrl);
+        }
         break;
       case 'page-load':
       case 'page-visible':
