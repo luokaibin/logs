@@ -7,7 +7,7 @@ export const genHandleMessage = (logEncoder) => {
   const logAggregator = LogAggregator.getInstance({
     logEncoder,
     flushInterval: 5 * 60 * 1000, // 5 minutes
-    flushSize: 2 * 1024 * 1024,   // 2MB
+    flushSize: 3 * 1024 * 1024,   // 3MB
   });
 
   const handle = (event) => {

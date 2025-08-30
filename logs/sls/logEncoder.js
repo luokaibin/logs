@@ -30,7 +30,7 @@ export default function logEncoder(logs, ctxId) {
         Time: Math.floor(time / 1000),
         Contents: Object.entries(rest).reduce((acc, [Key, Value]) => {
           // 卫语句：Key 必须有效，Value 不能是 null 或 undefined
-          if (!Key || Value === null || Value === undefined) {
+          if (!Key || Value === null || Value === undefined || Value === '') {
             return acc;
           }
 

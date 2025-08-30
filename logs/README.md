@@ -11,10 +11,9 @@
     - **服务端 (Node.js)**：默认为 `TRACE` 级别，确保捕获所有日志信息，方便开发调试及日志采集。可通过 `LOGS_LEVEL` 环境变量覆盖。
 - 🔌 **可扩展性**：模块化设计，易于扩展支持其他日志服务
 - 🚀 **高性能**：批量处理、压缩传输，减少网络开销
-- 💨 **智能去重**：自动对2秒内的重复日志进行去重，有效抑制日志风暴，降低存储和分析成本。
+- 💨 **智能去重**：自动对3秒内的重复日志进行去重，有效抑制日志风暴，降低存储和分析成本。
 - 🔍 **过滤功能**：支持关键词过滤，减少无用日志
 - 🧩 **Service Worker 支持**：通过 Service Worker 处理日志，减轻主线程负担
-- 🔒 **代码保护**：使用代码压缩和混淆技术，保护日志库的安全性
 - 🛠️ **开发辅助工具**：提供日志级别和关键字过滤控制面板，方便开发调试
 - 🧠 **智能序列化**：能够安全处理各类复杂数据结构（如深度嵌套对象、循环引用），并对超长数组进行智能采样（保留头、中、尾关键元素），在保留关键信息的同时有效防止日志超长被截断。
 
@@ -118,6 +117,21 @@ export default function RootLayout({ children }) {
 ```
 
 > **注意**: 不需要手动注册 Service Worker，beacon.js 会自动处理注册过程。Service Worker 会自动监听页面状态变化、错误事件和未处理的 Promise 异常。
+
+#### 3. (可选) 配置日志上报地址
+
+默认情况下，日志数据会被发送到 `/api/beacon` 接口。您可以通过在引入 `beacon.js` 的 `<script>` 标签上添加 `data-beacon-url` 属性来自定义上报地址。
+
+例如，要将日志发送到 `https://your-custom-endpoint.com/logs`：
+
+```html
+<script 
+  src="/beacon/beacon.js" 
+  data-beacon-url="https://your-custom-endpoint.com/logs"
+></script>
+```
+
+> **重要提示**：服务端需要相应地在您配置的地址上创建接收日志的接口。
 
 ### 服务端使用
 
@@ -252,19 +266,22 @@ export default function Logger() {
 
 ```
 logs/
-├── core/           # 核心日志模块
+├── browser/        # 浏览器端专用模块
+│   ├── beacon.js       # 日志发送客户端 (Client)
+│   └── beacon-sw.js    # 日志处理 Service Worker
 ├── common/         # 公共工具和组件
 │   ├── LogAggregator.js  # 日志聚合器
-│   ├── utils.js          # 工具函数
-│   └── serializeLogContent.js # 日志序列化
-├── sls/            # 阿里云日志服务集成
-│   ├── beacon.js   # 浏览器客户端（自动注册 Service Worker）
-│   ├── beacon-sw.js # Service Worker 处理模块
-│   └── slsClient.js # 服务端客户端
+│   ├── LogProcessor.js   # 日志处理器 (去重、过滤)
+│   ├── LogStore.js       # 日志持久化 (IndexedDB)
+│   └── utils.js          # 工具函数
+├── core/           # 核心日志模块 (isomorphic)
+│   └── logs.js         # 日志主入口
+├── sls/            # 阿里云日志服务 (SLS) 集成
+│   ├── logEncoder.js   # SLS 日志格式编码器
+│   └── slsClient.js    # SLS 服务端客户端
 ├── loki/           # Grafana Loki 集成
-│   ├── beacon.js   # 浏览器客户端（自动注册 Service Worker）
-│   ├── beacon-sw.js # Service Worker 处理模块
-│   └── lokiClient.js # 服务端客户端
+│   ├── logEncoder.js   # Loki 日志格式编码器
+│   └── lokiClient.js   # Loki 服务端客户端
 ├── types/          # TypeScript 类型定义
 └── eslint/         # ESLint 插件
     └── index.js    # 用于检测和转换 console 调用
