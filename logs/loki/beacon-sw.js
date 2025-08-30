@@ -1,13 +1,15 @@
 
-import {getLogAggregator} from '../browser/beacon-sw.js'
+import {genHandleMessage} from '../browser/beacon-sw.js'
 import lokiEncoder from './logEncoder.js'
 
-const logAggregator = getLogAggregator(lokiEncoder)
+const handleMessage = genHandleMessage(lokiEncoder)
 
-self.addEventListener('message', function(event) {
-  try {
-    if (!event.data || typeof event.data !== 'object') return;
-    logAggregator.handleEvent(event.data);
-  } catch (e) {
-  }
+self.addEventListener('message', handleMessage);
+
+self.addEventListener('install', event => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(self.clients.claim());
 });

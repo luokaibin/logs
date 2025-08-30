@@ -1,83 +1,164 @@
-import { getServiceWorker, sendLog } from '../common/utils.js';
-import { LogAggregator } from '../common/LogAggregator.js';
+import { getLogExtraInfo, getServiceWorker } from '../common/utils.js';
+import {serializeLogContent} from '../common/serializeLogContent.js';
+import { LogProcessor } from '../common/LogProcessor.js';
 
-export const generateLog = (logEncoder) => {
+export const generateLog = () => {
+  const currentScript = document.currentScript;
   function initSWBridge() {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      const logAggregator = LogAggregator.getInstance({
-        logEncoder,
-        flushInterval: 5 * 60 * 1000,
-        flushSize: 2 * 1024 * 1024,
-      });
-      
+      const logProcessor = new LogProcessor();
+      const initInfo = {
+        currentScript,
+        serviceWorker: null,
+      }
+
       // 发送事件
-      const sendSWEvent = async (event) => {
-        const serviceWorker = await getServiceWorker('/beacon/');
-        if (!serviceWorker) {
-          const customEvent = new CustomEvent('sendLog', {
-            detail: event
-          });
-          window.dispatchEvent(customEvent);
-        } else {
-          serviceWorker.postMessage(event);
+      const sendSWEvent = (msg) => {
+        if (initInfo.serviceWorker) {
+          return initInfo.serviceWorker.postMessage(msg);
         }
-        if (serviceWorker && logAggregator.getBufferSize() > 0) {
-          logAggregator.flushLogs();
-        }
+        const event = new CustomEvent('sendLog', {
+          detail: msg
+        });
+        window.dispatchEvent(event);
       };
 
-      // 注册 Service Worker（以 module 方式）
-      window.addEventListener('load', function() {
-        sendLog('trace', ['[logbeacon] page load']);
+      // 定义 Service Worker 注册函数
+      const registerServiceWorker = () => {
+        const extraInfo = getLogExtraInfo();
+        const loadLog = {
+          level: 'trace',
+          content: '[logbeacon] page load',
+          ...extraInfo
+        };
         // 指定 Service Worker 的路径和作用域
-        navigator.serviceWorker.register('/beacon/beacon-sw.js', { 
+        navigator.serviceWorker.register('/beacon/beacon-sw.js', {
           type: 'module',
           scope: '/beacon/' // 明确指定作用域
-        }).finally(() => {
-          sendLog('trace', ['[logbeacon] Service Worker registered successfully']);
+        }).then(async (registration) => {
+          if (registration.active) {
+            initInfo.serviceWorker = registration.active
+          } else {
+            initInfo.serviceWorker = await getServiceWorker();
+          }
+
+          // 读取 beacon-url 配置并发送
+          if (initInfo.currentScript) {
+            const beaconUrl = initInfo.currentScript.getAttribute('data-beacon-url');
+            if (beaconUrl) {
+              sendSWEvent({
+                type: 'config-update',
+                payload: {
+                  beaconUrl,
+                },
+              });
+            }
+          }
+
+          sendSWEvent({ type: 'log', payload: loadLog });
+          sendSWEvent({
+            type: 'log',
+            payload: {
+              level: 'trace',
+              content: '[logbeacon] Service Worker registered successfully',
+              ...extraInfo
+            }
+          });
           sendSWEvent({ type: 'page-load' });
+        }).catch((e) => {
+          sendSWEvent({ type: 'log', payload: loadLog });
+          sendSWEvent({
+            type: 'log',
+            payload: {
+              level: 'error',
+              content: '[logbeacon] Failed to register Service Worker',
+              ...extraInfo
+            }
+          });
         });
 
         // 页面卸载事件
         window.addEventListener('beforeunload', function() {
-          sendLog('trace', ['[logbeacon] page unload']);
+          const extraInfo = getLogExtraInfo();
+          const payload = {
+            level: 'trace',
+            content: '[logbeacon] page unload',
+            ...extraInfo
+          };
+          sendSWEvent({ type: 'log', payload });
           sendSWEvent({ type: 'page-unload' });
         });
+      };
 
-        // 前后台切换事件
-        document.addEventListener('visibilitychange', function() {
-          if (document.visibilityState === 'hidden') {
-            sendLog('trace', ['[logbeacon] page hidden']);
-            sendSWEvent({ type: 'page-hidden' });
-          } else if (document.visibilityState === 'visible') {
-            sendLog('trace', ['[logbeacon] page visible']);
-            sendSWEvent({ type: 'page-visible' });
+      // 立即注册 Service Worker
+      registerServiceWorker();
+
+      // 前后台切换事件
+      document.addEventListener('visibilitychange', async function() {
+        const extraInfo = getLogExtraInfo();
+        if (document.visibilityState === 'hidden') {
+          sendSWEvent({
+            type: 'log',
+            payload: {
+              level: 'trace',
+              content: '[logbeacon] page hidden',
+              ...extraInfo
+            }
+          });
+          sendSWEvent({ type: 'page-hidden' });
+        } else if (document.visibilityState === 'visible') {
+          sendSWEvent({
+            type: 'log',
+            payload: {
+              level: 'trace',
+              content: '[logbeacon] page visible',
+              ...extraInfo
+            }
+          });
+          sendSWEvent({ type: 'page-visible' });
+        }
+      });
+
+      // 错误捕获
+      window.addEventListener('error', function(e) {
+        const extraInfo = getLogExtraInfo();
+        sendSWEvent({
+          type: 'log',
+          payload: {
+            level: 'error',
+            content: serializeLogContent([e]),
+            ...extraInfo
           }
         });
-        /**
-         * TODO
-         * 监听 `error` 事件，捕获 JavaScript 运行时错误
-         * 监听 `unhandledrejection` 事件,捕获未处理的 Promise 异常
-         * 对于 `error` 和 `unhandledrejection` 事件，捕获到的错误先处理成标准格式，然后尝试发送给service worker，如果service worker状态异常就调用navigator.sendBeacon()进行日志上报
-         */
-        window.addEventListener('error', function(e) {
-          sendLog('error', [e]);
+      });
+
+      window.addEventListener('unhandledrejection', function(e) {
+        const extraInfo = getLogExtraInfo();
+        sendSWEvent({
+          type: 'log',
+          payload: {
+            level: 'error',
+            content: serializeLogContent([e]),
+            ...extraInfo
+          }
         });
-        window.addEventListener('unhandledrejection', function(e) {
-          sendLog('error', [e]);
-        });
-        window.addEventListener('sendLog', function(e) {
-          logAggregator.handleEvent(e.detail);
-        });
+      });
+
+      // 监听内部事件，当SW不存在时，由主线程处理
+      window.addEventListener('sendLog', function(e) {
+        if (e.detail.type === 'log') {
+          logProcessor.insertLog(e.detail.payload);
+        }
       });
     }
   }
+
+  // 根据 DOM 加载状态来初始化
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', initSWBridge);
     } else {
-      // 如果 document 已经加载完成，立即初始化
       initSWBridge();
     }
   }
-}
+};
