@@ -44,7 +44,7 @@ export class LogAggregator extends LogProcessor {
    * @param {(logs: LogItem[]) => Uint8Array} options.logEncoder - 日志编码器
    * @param {number} [options.flushInterval=300000] - 日志自动发送间隔（毫秒），默认5分钟
    * @param {number} [options.flushSize=3145728] - 日志缓冲区大小上限（字节），默认3MB
-   * @param {number} [options.dedupInterval=2000] - 重复日志去重时间窗口（毫秒）
+   * @param {number} [options.dedupInterval=3000] - 重复日志去重时间窗口（毫秒）
    */
   constructor(options = {}) {
     super(options);
@@ -83,7 +83,7 @@ export class LogAggregator extends LogProcessor {
      * @type {number}
      * @private
      */
-    this._flushSize = options.flushSize || 2 * 1024 * 1024; // 默认2MB
+    this._flushSize = options.flushSize || 3 * 1024 * 1024; // 默认3MB
 
     /**
      * 日志上下文 - 用于标识日志批次，格式为 `${prefix}-${logGroupId}` 禁止直接使用
@@ -358,7 +358,7 @@ export class LogAggregator extends LogProcessor {
    * 获取单例实例
    * @param {Object} options - 配置选项
    * @param {number} [options.flushInterval=300000] - 日志自动发送间隔（毫秒），默认5分钟
-   * @param {number} [options.flushSize=2097152] - 日志缓冲区大小上限（字节），默认2MB
+   * @param {number} [options.flushSize=3145728] - 日志缓冲区大小上限（字节），默认3MB
    * @returns {LogAggregator} 日志聚合器实例
    */
   static getInstance(options) {
