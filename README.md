@@ -309,43 +309,34 @@ logs/
 sequenceDiagram
     participant User as 用户代码
     participant Core as 核心日志模块
+    participant BeaconJS as beacon.js (主线程)
+    participant LogProc as LogProcessor (主线程)
     participant SW as Service Worker
-    participant BeaconJS as beacon.js
-    participant Events as 页面事件
-    participant LogAgg as LogAggregator
-    participant API as API接口(/api/beacon)
-    participant LogClient as 日志客户端(SLS/Loki)
+    participant LogAgg as LogAggregator (SW中)
+    participant API as API接口
+    participant LogClient as 日志客户端
     participant LogService as 日志服务
-    
-    %% 用户打印日志
-    User->>Core: 调用日志方法(log.info/warn/error)
-    
-    %% 核心模块处理
-    alt Service Worker存在
-        Core->>SW: 发送消息(postMessage)
+
+    User->>Core: 调用日志方法 (log.info)
+
+    alt Service Worker 已激活
+        Core->>SW: 发送消息 (postMessage)
         SW->>LogAgg: 转发日志数据
-    else Service Worker不存在
-        Core->>BeaconJS: 发送自定义事件
-        BeaconJS->>LogAgg: 监听事件并转发日志数据
-    end
-    
-    %% 页面事件监听
-    Events->>BeaconJS: 触发页面事件(隐藏/显示/错误/Promise异常)
-    
-    alt Service Worker存在
-        BeaconJS->>SW: 发送消息(postMessage)
-        SW->>LogAgg: 转发事件数据
-    else Service Worker不存在
-        BeaconJS->>LogAgg: 监听事件并直接处理
-    end
-    
-    %% LogAggregator决策
-    alt 需要发送日志(定时/数据量/页面状态变化)
-        LogAgg->>API: 发送压缩后的日志数据
-        API->>LogClient: 调用日志客户端
-        LogClient->>LogService: 上报日志到日志服务
-    else 暂存日志
-        LogAgg->>LogAgg: 将日志存储在内存中
+        LogAgg-->>LogAgg: 聚合/压缩/持久化到IndexedDB
+        
+        alt 需要发送日志 (定时/数据量/页面卸载)
+            LogAgg->>API: fetch()
+            API->>LogClient: 调用日志客户端
+            LogClient->>LogService: 上报日志
+        else 暂存日志
+            LogAgg-->>LogAgg: 将日志存入 IndexedDB
+        end
+
+    else Service Worker 未激活/异常
+        Core->>BeaconJS: 触发自定义事件 (sendLog)
+        BeaconJS->>LogProc: 监听到事件, 调用 addLog
+        LogProc-->>LogProc: 将日志存入IndexedDB (等待SW激活)
+        Note right of LogProc: 主线程仅暂存日志, 不负责上报
     end
 ```
 

@@ -325,7 +325,7 @@ sequenceDiagram
         LogAgg-->>LogAgg: 聚合/压缩/持久化到IndexedDB
         
         alt 需要发送日志 (定时/数据量/页面卸载)
-            LogAgg->>API: navigator.sendBeacon()
+            LogAgg->>API: fetch()
             API->>LogClient: 调用日志客户端
             LogClient->>LogService: 上报日志
         else 暂存日志
@@ -335,7 +335,7 @@ sequenceDiagram
     else Service Worker 未激活/异常
         Core->>BeaconJS: 触发自定义事件 (sendLog)
         BeaconJS->>LogProc: 监听到事件, 调用 addLog
-        LogProc-->>LogProc: 将日志存入内存 (等待SW激活)
+        LogProc-->>LogProc: 将日志存入IndexedDB (等待SW激活)
         Note right of LogProc: 主线程仅暂存日志, 不负责上报
     end
 ```
