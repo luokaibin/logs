@@ -53,7 +53,7 @@ export class LogAggregator extends LogProcessor {
     }
     /**
      * 日志编码器
-     * @type {(logs: LogItem[], logContext: string) => Promise<Uint8Array>}
+     * @type {(logs: LogItem[], logContext: string) => Uint8Array}
      * @private
      */
     this._logEncoder = options.logEncoder;
@@ -297,7 +297,6 @@ export class LogAggregator extends LogProcessor {
         await fetch(beaconUrl, {
           method: 'POST',
           body,
-          keepalive: true,
         });
       }
       await this.reset();

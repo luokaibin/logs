@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'beacon-db';
-const DB_VERSION = 2;
+const DB_VERSION = 1;
 
 // 定义对象存储区的名称
 const STORE_LOGS = 'b_dat';

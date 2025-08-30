@@ -3,11 +3,12 @@ import {serializeLogContent} from '../common/serializeLogContent.js';
 import { LogProcessor } from '../common/LogProcessor.js';
 
 export const generateLog = () => {
+  const currentScript = document.currentScript;
   function initSWBridge() {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       const logProcessor = new LogProcessor();
       const initInfo = {
-        currentScript: document.currentScript,
+        currentScript,
         serviceWorker: null,
       }
 
@@ -120,6 +121,7 @@ export const generateLog = () => {
 
       // 错误捕获
       window.addEventListener('error', function(e) {
+        const extraInfo = getLogExtraInfo();
         sendSWEvent({
           type: 'log',
           payload: {
@@ -131,6 +133,7 @@ export const generateLog = () => {
       });
 
       window.addEventListener('unhandledrejection', function(e) {
+        const extraInfo = getLogExtraInfo();
         sendSWEvent({
           type: 'log',
           payload: {
