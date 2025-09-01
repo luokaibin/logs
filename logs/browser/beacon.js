@@ -126,7 +126,7 @@ export const generateLog = () => {
           type: 'log',
           payload: {
             level: 'error',
-            content: serializeLogContent([e]),
+            content: serializeLogContent([e.error]),
             ...extraInfo
           }
         });
@@ -138,7 +138,7 @@ export const generateLog = () => {
           type: 'log',
           payload: {
             level: 'error',
-            content: serializeLogContent([e]),
+            content: serializeLogContent([e.reason]),
             ...extraInfo
           }
         });
