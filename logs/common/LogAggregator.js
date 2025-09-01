@@ -205,18 +205,29 @@ export class LogAggregator extends LogProcessor {
     if (this._logBuffer) {
       return this._logBuffer;
     }
+    const {logs, logsBytes} = await this._loadAndDecodeLogsFromDB();
+    this._logBuffer = logs;
+    this._logBufferBytes = logsBytes;
+    return this._logBuffer;
+  }
+
+  /**
+   * 从DB加载并解码所有日志
+   * @private
+   * @returns {Promise<{logs: LogItem[], logsBytes: number}>}
+   */
+  async _loadAndDecodeLogsFromDB() {
     const logs = await this.getAllLogs();
     if (!logs || logs.length === 0) {
-      this._logBufferBytes = 0;
-      this._logBuffer = [];
-      return this._logBuffer;
-    };
-    this._logBufferBytes = 0;
-    this._logBuffer = logs.map(log => {
-      this._logBufferBytes += log.length;
+      return {logs: [], logsBytes: 0};
+    }
+    let logsBytes = 0;
+    // 解码
+    const decodedLogs = logs.map(log => {
+      logsBytes += log.length;
       return this.decodeLog(log);
     });
-    return this._logBuffer;
+    return {logs: decodedLogs, logsBytes};
   }
   /**
    * 添加日志到缓冲区
@@ -283,7 +294,7 @@ export class LogAggregator extends LogProcessor {
    * @returns {Promise<void>}
    */
   async flushLogs() {
-    const logBuffer = await this._getLogBuffer();
+    const {logs: logBuffer} = await this._loadAndDecodeLogsFromDB();
     if (!logBuffer || logBuffer.length === 0) return;
     const ctxId = await this?._generateLogContext?.();
     const payload = this._logEncoder(logBuffer, ctxId);
