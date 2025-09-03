@@ -18,9 +18,9 @@ export interface MethodMapConfig {
 }
 
 /**
- * ESLint规则配置选项
+ * ESLint规则配置选项 - prefer-log-over-console
  */
-export interface RuleOptions {
+export interface PreferLogRuleOptions {
   /**
    * 导入源，默认为 'logbeacon'
    */
@@ -38,10 +38,46 @@ export interface RuleOptions {
 }
 
 /**
+ * ESLint规则配置选项 - no-logs-in-component-scope
+ */
+export interface NoLogsInComponentScopeOptions {
+  /**
+   * 是否检查 React 组件，默认为 true
+   */
+  checkComponents?: boolean;
+  
+  /**
+   * 是否检查自定义 Hooks，默认为 true
+   */
+  checkHooks?: boolean;
+  
+  /**
+   * 是否检查类组件，默认为 true
+   */
+  checkClassComponents?: boolean;
+  
+  /**
+   * 组件名称的正则表达式模式数组，默认为 ["^[A-Z]"]
+   */
+  componentPatterns?: string[];
+  
+  /**
+   * Hook 名称的正则表达式模式数组，默认为 ["^use[A-Z]"]
+   */
+  hookPatterns?: string[];
+  
+  /**
+   * 允许使用日志的上下文，默认为 ["useEffect", "useCallback", "useMemo", "useLayoutEffect", "eventHandler"]
+   */
+  allowedContexts?: ('useEffect' | 'useCallback' | 'useMemo' | 'useLayoutEffect' | 'eventHandler')[];
+}
+
+/**
  * ESLint插件规则集
  */
 export interface EslintPluginRules {
   'prefer-log-over-console': Rule.RuleModule;
+  'no-logs-in-component-scope': Rule.RuleModule;
 }
 
 /**
@@ -51,7 +87,8 @@ export interface EslintPluginConfig {
   plugins: {
     'logs-transform': {
       rules: {
-        'prefer-log-over-console': 'warn' | 'error' | 'off' | ['warn' | 'error' | 'off', RuleOptions];
+        'prefer-log-over-console': 'warn' | 'error' | 'off' | ['warn' | 'error' | 'off', PreferLogRuleOptions];
+        'no-logs-in-component-scope': 'warn' | 'error' | 'off' | ['warn' | 'error' | 'off', NoLogsInComponentScopeOptions];
       }
     }
   }
@@ -71,6 +108,7 @@ export interface EslintPlugin {
    */
   configs: {
     recommended: EslintPluginConfig;
+    'react-strict': EslintPluginConfig;
   }
 }
 

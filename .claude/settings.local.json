@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(npm test)",
+      "Bash(npx mocha:*)",
+      "Bash(npx babel-node:*)",
+      "Bash(npm test)",
+      "Bash(npm test:*)",
+      "Bash(sed:*)"
+    ],
+    "deny": []
+  }
+}

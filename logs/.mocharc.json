@@ -1,0 +1,11 @@
+{
+  "require": ["@babel/register"],
+  "extensions": ["js"],
+  "spec": "tests/**/*.test.js",
+  "reporter": "spec",
+  "timeout": 10000,
+  "slow": 1000,
+  "node-option": [
+    "experimental-specifier-resolution=node"
+  ]
+}
