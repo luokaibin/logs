@@ -55,7 +55,10 @@
   "scripts": {
     "build": "rollup -c rollup.config.js",
     "dev": "rollup -c rollup.config.js -w",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "mocha",
+    "test:watch": "mocha --watch",
+    "test:eslint": "mocha 'tests/rules/*.test.js'",
+    "test:dev": "node eslint/rules/__tests__/enhanced-test.cjs",
     "clean": "rm -rf dist",
     "proto:compile": "pnpx pbf sls/sls.proto > sls/sls.js && pnpx pbf common/log.proto > common/log.proto.js"
   },
@@ -94,14 +97,21 @@
     "ua-parser-js": "^2.0.3"
   },
   "devDependencies": {
+    "@babel/cli": "^7.28.3",
+    "@babel/core": "^7.28.3",
+    "@babel/preset-env": "^7.28.3",
+    "@babel/register": "^7.28.3",
     "@rollup/plugin-commonjs": "^24.0.0",
     "@rollup/plugin-node-resolve": "^15.0.0",
     "@rollup/plugin-terser": "^0.4.4",
+    "chai": "^6.0.1",
+    "eslint": "^9.34.0",
     "javascript-obfuscator": "^4.1.1",
+    "mocha": "^11.7.2",
     "rollup": "^3.20.0",
     "rollup-plugin-obfuscator": "^1.1.0"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.18.0"
   }
 }
