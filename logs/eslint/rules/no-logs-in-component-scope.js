@@ -246,7 +246,7 @@ module.exports = {
       // 箭头函数：变量声明中的箭头函数，以 use 开头
       if (node.type === 'ArrowFunctionExpression') {
         const parent = node.parent;
-        if (parent && parent.type === 'VariableDeclarator' && parent.id.name) {
+        if (parent && parent.type === 'VariableDeclarator' && parent.id && parent.id.name) {
           functionName = parent.id.name;
         }
       }

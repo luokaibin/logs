@@ -113,7 +113,7 @@ describe('no-logs-in-component-scope', function() {
                 desc: '删除错误的日志调用',
                 output: `
             function MyComponent() {
-              
+               // 这应该被检测到
               return <div>Test</div>;
             }
           `
@@ -341,7 +341,8 @@ describe('no-logs-in-component-scope', function() {
 
       customRuleTester.run('no-logs-in-component-scope with custom patterns', rule, {
         valid: [
-          // YourComponent 不匹配 ^My[A-Z] 模式，应该被允许
+          // 函数不返回JSX且不使用React Hooks，因此不被识别为组件，应该被允许
+          // (注：名称模式为次要因素，主要判断依据是是否为真正的React组件)
           {
             code: `
               function YourComponent() {

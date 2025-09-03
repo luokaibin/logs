@@ -29,7 +29,16 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             `,
             errors: [{
               message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-              type: 'CallExpression'
+              type: 'CallExpression',
+              suggestions: [{
+                desc: '删除错误的日志调用',
+                output: `
+              function MyComponent() {
+                
+                return <div>Test</div>;
+              }
+            `
+              }]
             }]
           }
         ]
@@ -49,7 +58,16 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             `,
             errors: [{
               message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-              type: 'CallExpression'
+              type: 'CallExpression',
+              suggestions: [{
+                desc: '删除错误的日志调用',
+                output: `
+              const MyComponent = () => {
+                
+                return <div>Test</div>;
+              }
+            `
+              }]
             }]
           }
         ]
@@ -69,7 +87,16 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             `,
             errors: [{
               message: '避免在自定义 Hook 一级作用域中直接调用日志方法。建议将日志移动到 useEffect 或条件分支中。',
-              type: 'CallExpression'
+              type: 'CallExpression',
+              suggestions: [{
+                desc: '删除错误的日志调用',
+                output: `
+              function useCustomHook() {
+                
+                return useState(null);
+              }
+            `
+              }]
             }]
           }
         ]
@@ -91,7 +118,18 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             `,
             errors: [{
               message: '避免在 React 类组件方法中直接调用日志方法。建议将日志移动到生命周期方法或事件处理函数中。',
-              type: 'CallExpression'
+              type: 'CallExpression',
+              suggestions: [{
+                desc: '删除错误的日志调用',
+                output: `
+              class MyComponent extends React.Component {
+                render() {
+                  
+                  return <div>Test</div>;
+                }
+              }
+            `
+              }]
             }]
           }
         ]
@@ -113,7 +151,16 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             `,
             errors: [{
               message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-              type: 'CallExpression'
+              type: 'CallExpression',
+              suggestions: [{
+                desc: '删除错误的日志调用',
+                output: `
+              function ConditionalComponent({ isVisible }) {
+                
+                return isVisible ? <div>Visible</div> : null;
+              }
+            `
+              }]
             }]
           }
         ]
@@ -133,7 +180,16 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             `,
             errors: [{
               message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-              type: 'CallExpression'
+              type: 'CallExpression',
+              suggestions: [{
+                desc: '删除错误的日志调用',
+                output: `
+              function LogicalComponent({ condition }) {
+                
+                return condition && <div>Content</div>;
+              }
+            `
+              }]
             }]
           }
         ]
@@ -153,7 +209,16 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             `,
             errors: [{
               message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-              type: 'CallExpression'
+              type: 'CallExpression',
+              suggestions: [{
+                desc: '删除错误的日志调用',
+                output: `
+              function CreateElementComponent() {
+                
+                return React.createElement('div', null, 'Content');
+              }
+            `
+              }]
             }]
           }
         ]
@@ -192,7 +257,30 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             code: largeCode,
             errors: [{
               message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-              type: 'CallExpression'
+              type: 'CallExpression',
+              suggestions: [{
+                desc: '删除错误的日志调用',
+                output: `
+        function LargeComponent() {
+          
+          
+          // 模拟大量代码
+          const items = Array.from({ length: 1000 }, (_, i) => ({
+            id: i,
+            name: \`Item \${i}\`,
+            value: Math.random()
+          }));
+          
+          return (
+            <div>
+              {items.map(item => (
+                <div key={item.id}>{item.name}</div>
+              ))}
+            </div>
+          );
+        }
+      `
+              }]
             }]
           }
         ]
@@ -224,11 +312,39 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             errors: [
               {
                 message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-                type: 'CallExpression'
+                type: 'CallExpression',
+                suggestions: [{
+                  desc: '删除错误的日志调用',
+                  output: `
+        function Component1() {
+          
+          return <div>Component1</div>;
+        }
+        
+        function Component2() {
+          log.info('render2');
+          return <div>Component2</div>;
+        }
+      `
+                }]
               },
               {
                 message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-                type: 'CallExpression'
+                type: 'CallExpression',
+                suggestions: [{
+                  desc: '删除错误的日志调用',
+                  output: `
+        function Component1() {
+          log.info('render1');
+          return <div>Component1</div>;
+        }
+        
+        function Component2() {
+          
+          return <div>Component2</div>;
+        }
+      `
+                }]
               }
             ]
           }
@@ -438,11 +554,33 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             errors: [
               {
                 message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-                type: 'CallExpression'
+                type: 'CallExpression',
+                suggestions: [{
+                  desc: '删除错误的日志调用',
+                  output: `
+              function MultiLogComponent() {
+                
+                const data = fetchData();
+                log.info('data fetched');
+                return <div>{data}</div>;
+              }
+            `
+                }]
               },
               {
                 message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-                type: 'CallExpression'
+                type: 'CallExpression',
+                suggestions: [{
+                  desc: '删除错误的日志调用',
+                  output: `
+              function MultiLogComponent() {
+                log.info('render start');
+                const data = fetchData();
+                
+                return <div>{data}</div>;
+              }
+            `
+                }]
               }
             ]
           }
@@ -469,7 +607,22 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             `,
             errors: [{
               message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-              type: 'CallExpression'
+              type: 'CallExpression',
+              suggestions: [{
+                desc: '删除错误的日志调用',
+                output: `
+              function HookComponent() {
+                const [state, setState] = useState(null);
+                
+                
+                useEffect(() => {
+                  setState('loaded');
+                }, []);
+                
+                return <div>{state}</div>;
+              }
+            `
+              }]
             }]
           }
         ]
@@ -496,11 +649,41 @@ describe('no-logs-in-component-scope - Enhanced Error Messages', function() {
             errors: [
               {
                 message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-                type: 'CallExpression'
+                type: 'CallExpression',
+                suggestions: [{
+                  desc: '删除错误的日志调用',
+                  output: `
+              function OuterComponent() {
+                
+                
+                function InnerComponent() {
+                  log.info('inner render');
+                  return <div>Inner</div>;
+                }
+                
+                return <div><InnerComponent /></div>;
+              }
+            `
+                }]
               },
               {
                 message: '避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。',
-                type: 'CallExpression'
+                type: 'CallExpression',
+                suggestions: [{
+                  desc: '删除错误的日志调用',
+                  output: `
+              function OuterComponent() {
+                log.info('outer render');
+                
+                function InnerComponent() {
+                  
+                  return <div>Inner</div>;
+                }
+                
+                return <div><InnerComponent /></div>;
+              }
+            `
+                }]
               }
             ]
           }
