@@ -22,13 +22,6 @@ describe('require-log-message-prefix', function() {
         },
         {
           code: `log.warn('[警告]内存使用过高');`
-        },
-        // 非字符串参数应该跳过检查
-        {
-          code: `log.info(userInfo);`
-        },
-        {
-          code: `log.error(new Error('something'));`
         }
       ],
       invalid: [
@@ -46,6 +39,21 @@ describe('require-log-message-prefix', function() {
           output: `log.error('[文案]网络连接失败');`,
           errors: [{
             message: '日志消息应该以 "[文案]" 格式开头，例如：log.info("[文案]用户登录成功")',
+            type: 'CallExpression'
+          }]
+        },
+        // 非字符串参数现在会提示手动添加前缀
+        {
+          code: `log.info(userInfo);`,
+          errors: [{
+            message: '日志消息应该以 "[文案]" 格式开头，请手动添加前缀。支持字符串字面量和模板字符串的自动修复。',
+            type: 'CallExpression'
+          }]
+        },
+        {
+          code: `log.error(new Error('something'));`,
+          errors: [{
+            message: '日志消息应该以 "[文案]" 格式开头，请手动添加前缀。支持字符串字面量和模板字符串的自动修复。',
             type: 'CallExpression'
           }]
         }
@@ -196,21 +204,58 @@ describe('require-log-message-prefix', function() {
         // 只有[xxx]的字符串
         { code: `log.info('[文案]');` },
         // 复杂的[xxx]格式
-        { code: `log.info('[用户行为:登录]用户成功登录系统');` },
-        // 模板字面量应该跳过检查
-        { code: `log.info(\`用户\${name}登录\`);` },
-        // 变量引用应该跳过检查
-        { code: `log.info(message);` },
-        // 数字字面量应该跳过检查
-        { code: `log.info(123);` },
-        // 布尔值应该跳过检查
-        { code: `log.info(true);` },
-        // null应该跳过检查
-        { code: `log.info(null);` },
-        // 对象应该跳过检查
-        { code: `log.info({user: 'test'});` }
+        { code: `log.info('[用户行为:登录]用户成功登录系统');` }
       ],
       invalid: [
+        // 模板字面量现在支持自动修复
+        { 
+          code: `log.info(\`用户\${name}登录\`);`,
+          output: `log.info(\`[文案]用户\${name}登录\`);`,
+          errors: [{
+            message: '日志消息应该以 "[文案]" 格式开头，例如：log.info("[文案]用户登录成功")',
+            type: 'CallExpression'
+          }]
+        },
+        // 变量引用现在会提示手动添加前缀
+        { 
+          code: `log.info(message);`,
+          errors: [{
+            message: '日志消息应该以 "[文案]" 格式开头，请手动添加前缀。支持字符串字面量和模板字符串的自动修复。',
+            type: 'CallExpression'
+          }]
+        },
+        // 数字字面量现在会提示手动添加前缀
+        { 
+          code: `log.info(123);`,
+          errors: [{
+            message: '日志消息应该以 "[文案]" 格式开头，请手动添加前缀。支持字符串字面量和模板字符串的自动修复。',
+            type: 'CallExpression'
+          }]
+        },
+        // 布尔值现在会提示手动添加前缀
+        { 
+          code: `log.info(true);`,
+          errors: [{
+            message: '日志消息应该以 "[文案]" 格式开头，请手动添加前缀。支持字符串字面量和模板字符串的自动修复。',
+            type: 'CallExpression'
+          }]
+        },
+        // null现在会提示手动添加前缀
+        { 
+          code: `log.info(null);`,
+          errors: [{
+            message: '日志消息应该以 "[文案]" 格式开头，请手动添加前缀。支持字符串字面量和模板字符串的自动修复。',
+            type: 'CallExpression'
+          }]
+        },
+        // 对象现在会提示手动添加前缀
+        { 
+          code: `log.info({user: 'test'});`,
+          errors: [{
+            message: '日志消息应该以 "[文案]" 格式开头，请手动添加前缀。支持字符串字面量和模板字符串的自动修复。',
+            type: 'CallExpression'
+          }]
+        },
         // 单字符消息
         {
           code: `log.info('A');`,
@@ -251,11 +296,11 @@ describe('require-log-message-prefix', function() {
         { code: `log.error('[文案]错误信息');` }
       ],
       invalid: [
-        { code: `log.trace('跟踪信息');`, output: `log.trace('[文案]跟踪信息');`, errors: 1 },
-        { code: `log.debug('调试信息');`, output: `log.debug('[文案]调试信息');`, errors: 1 },
-        { code: `log.info('一般信息');`, output: `log.info('[文案]一般信息');`, errors: 1 },
-        { code: `log.warn('警告信息');`, output: `log.warn('[文案]警告信息');`, errors: 1 },
-        { code: `log.error('错误信息');`, output: `log.error('[文案]错误信息');`, errors: 1 }
+        { code: `log.trace('跟踪信息');`, output: `log.trace('[文案]跟踪信息');`, errors: [{ message: '日志消息应该以 "[文案]" 格式开头，例如：log.info("[文案]用户登录成功")', type: 'CallExpression' }] },
+        { code: `log.debug('调试信息');`, output: `log.debug('[文案]调试信息');`, errors: [{ message: '日志消息应该以 "[文案]" 格式开头，例如：log.info("[文案]用户登录成功")', type: 'CallExpression' }] },
+        { code: `log.info('一般信息');`, output: `log.info('[文案]一般信息');`, errors: [{ message: '日志消息应该以 "[文案]" 格式开头，例如：log.info("[文案]用户登录成功")', type: 'CallExpression' }] },
+        { code: `log.warn('警告信息');`, output: `log.warn('[文案]警告信息');`, errors: [{ message: '日志消息应该以 "[文案]" 格式开头，例如：log.info("[文案]用户登录成功")', type: 'CallExpression' }] },
+        { code: `log.error('错误信息');`, output: `log.error('[文案]错误信息');`, errors: [{ message: '日志消息应该以 "[文案]" 格式开头，例如：log.info("[文案]用户登录成功")', type: 'CallExpression' }] }
       ]
     });
   });
