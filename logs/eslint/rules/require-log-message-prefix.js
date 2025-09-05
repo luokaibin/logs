@@ -66,8 +66,8 @@ const rule = {
       if (typeof str !== 'string') return false;
       // 空字符串跳过检查
       if (str.length === 0) return true;
-      // 正则表达式：以[开头，中间至少有一个非空白字符，以]结尾
-      return /^\[[^\s\]]+\]/.test(str);
+      // 正则表达式：以[开头，中间可以是任何内容（包括空格），但不能是空括号，以]结尾
+      return /^\[[^\]]+\]/.test(str);
     }
     
     return {

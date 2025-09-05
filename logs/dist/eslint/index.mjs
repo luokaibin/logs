@@ -3,223 +3,10 @@ function getDefaultExportFromCjs (x) {
 }
 
 /**
- * @fileoverview Rule to prefer log.xxx over console.xxx
- */
-
-const MESSAGE_ID$2 = "preferLogOverConsole";
-const DEFAULT_IMPORT_SOURCE = "logbeacon";
-const DEFAULT_IMPORT_NAME = "log";
-
-const DEFAULT_METHOD_MAP = {
-  log: "debug",
-  debug: "debug",
-  info: "info",
-  warn: "warn",
-  error: "error",
-  trace: "trace"
-};
-
-/** @type {import('eslint').Rule.RuleModule} */
-var preferLogOverConsole = {
-  meta: {
-    type: "suggestion",
-    docs: {
-      description: "建议使用 log.xxx 而不是 console.xxx",
-      category: "Best Practices",
-      recommended: true,
-    },
-    fixable: "code",
-    schema: [
-      {
-        type: "object",
-        properties: {
-          importSource: { type: "string" },
-          importName: { type: "string" },
-          methodMap: {
-            type: "object",
-            additionalProperties: { type: "string" }
-          }
-        },
-        additionalProperties: false
-      }
-    ],
-    messages: {
-      [MESSAGE_ID$2]: `请使用 log 对象进行日志输出，支持的方法有: 
-- log.trace————用来跟踪代码执行流程、用户行为
-- log.debug————用来调试代码
-- log.info————用来记录一般信息
-- log.warn————用来记录警告信息
-- log.error————用来记录错误信息`
-    },
-  },
-  create(context) {
-    const options = context.options[0] || {};
-    const importSource = options.importSource || DEFAULT_IMPORT_SOURCE;
-    const importName = options.importName || DEFAULT_IMPORT_NAME;
-    const methodMap = { ...DEFAULT_METHOD_MAP, ...(options.methodMap || {}) };
-    
-    // 跟踪导入状态
-    let importInfo = {
-      hasImport: false,
-      lastImportNode: null,
-      isESM: true // 默认假设是ESM
-    };
-    
-    // 检查是否有解构赋值的console
-    let destructuredConsole = new Set();
-    
-    return {
-      // 检查导入语句
-      ImportDeclaration(node) {
-        if (node.source.value === importSource) {
-          const hasDefaultImport = node.specifiers.some(spec => 
-            spec.type === "ImportDefaultSpecifier" && 
-            spec.local.name === importName);
-          
-          if (hasDefaultImport) {
-            importInfo.hasImport = true;
-          }
-        }
-        // 记录最后一个导入语句
-        importInfo.lastImportNode = node;
-      },
-      
-      // 检查 CommonJS require
-      "VariableDeclarator[init.callee.name='require']"(node) {
-        if (node.init.arguments[0].value === importSource) {
-          if (node.id.type === "Identifier" && node.id.name === importName) {
-            importInfo.hasImport = true;
-            importInfo.isESM = false;
-          }
-        }
-      },
-      
-      // 检查console的解构赋值
-      "VariableDeclarator[init.name='console']"(node) {
-        if (node.id.type === "ObjectPattern") {
-          node.id.properties.forEach(prop => {
-            if (prop.key.name && Object.keys(methodMap).includes(prop.key.name)) {
-              destructuredConsole.add(prop.value.name);
-            }
-          });
-        }
-      },
-      
-      // 检测 console.xxx 调用
-      "CallExpression[callee.object.name='console']"(node) {
-        const method = node.callee.property.name;
-        
-        if (Object.keys(methodMap).includes(method)) {
-          context.report({
-            node,
-            messageId: MESSAGE_ID$2,
-            fix(fixer) {
-              const fixes = [];
-              
-              // 根据映射替换方法
-              const logMethod = methodMap[method];
-              fixes.push(fixer.replaceText(node.callee, `${importName}.${logMethod}`));
-              
-              // 如果需要，添加导入语句
-              if (!importInfo.hasImport) {
-                if (importInfo.lastImportNode) {
-                  // 在最后一个导入语句后添加
-                  fixes.push(
-                    fixer.insertTextAfter(
-                      importInfo.lastImportNode, 
-                      `\nimport ${importName} from "${importSource}";`
-                    )
-                  );
-                } else if (context.sourceCode.ast.body.length > 0) {
-                  // 在文件开头添加
-                  fixes.push(
-                    fixer.insertTextBefore(
-                      context.sourceCode.ast.body[0], 
-                      `import ${importName} from "${importSource}";\n\n`
-                    )
-                  );
-                }
-                importInfo.hasImport = true;
-              }
-              
-              return fixes;
-            }
-          });
-        }
-      },
-      
-      // 检测解构后的console方法调用
-      CallExpression(node) {
-        if (node.callee.type === "Identifier" && 
-            destructuredConsole.has(node.callee.name)) {
-          
-          // 找到对应的原始console方法
-          let originalMethod = null;
-          for (const [method, value] of Object.entries(methodMap)) {
-            if (node.callee.name === method) {
-              originalMethod = method;
-              break;
-            }
-          }
-          
-          if (originalMethod) {
-            context.report({
-              node,
-              messageId: MESSAGE_ID$2,
-              fix(fixer) {
-                const fixes = [];
-                
-                // 替换为log方法
-                const logMethod = methodMap[originalMethod];
-                fixes.push(fixer.replaceText(node.callee, `${importName}.${logMethod}`));
-                
-                // 如果需要，添加导入语句
-                if (!importInfo.hasImport) {
-                  if (importInfo.isESM) {
-                    if (importInfo.lastImportNode) {
-                      fixes.push(
-                        fixer.insertTextAfter(
-                          importInfo.lastImportNode, 
-                          `\nimport ${importName} from "${importSource}";`
-                        )
-                      );
-                    } else if (context.sourceCode.ast.body.length > 0) {
-                      fixes.push(
-                        fixer.insertTextBefore(
-                          context.sourceCode.ast.body[0], 
-                          `import ${importName} from "${importSource}";\n\n`
-                        )
-                      );
-                    }
-                  } else {
-                    // CommonJS 导入
-                    if (context.sourceCode.ast.body.length > 0) {
-                      fixes.push(
-                        fixer.insertTextBefore(
-                          context.sourceCode.ast.body[0], 
-                          `const ${importName} = require("${importSource}");\n\n`
-                        )
-                      );
-                    }
-                  }
-                  importInfo.hasImport = true;
-                }
-                
-                return fixes;
-              }
-            });
-          }
-        }
-      }
-    };
-  }
-};
-
-/**
  * @fileoverview Rule to avoid direct log calls in React component scope
  */
 
-const MESSAGE_ID$1 = "noLogsInComponentScope";
+const MESSAGE_ID$2 = "noLogsInComponentScope";
 
 /** @type {import('eslint').Rule.RuleModule} */
 var noLogsInComponentScope = {
@@ -277,7 +64,7 @@ var noLogsInComponentScope = {
       additionalProperties: false
     }],
     messages: {
-      [MESSAGE_ID$1]: "避免在 {{contextType}}一级作用域中直接调用日志方法。建议将日志移动到 {{suggestions}}。",
+      [MESSAGE_ID$2]: "避免在 {{contextType}}一级作用域中直接调用日志方法。建议将日志移动到 {{suggestions}}。",
       "noLogsInFunctionComponent": "避免在 React 组件一级作用域中直接调用日志方法。建议将日志移动到 useEffect、useCallback 或事件处理函数中。",
       "noLogsInHook": "避免在自定义 Hook 一级作用域中直接调用日志方法。建议将日志移动到 useEffect 或条件分支中。",
       "noLogsInClassComponent": "避免在 React 类组件方法中直接调用日志方法。建议将日志移动到生命周期方法或事件处理函数中。"
@@ -650,7 +437,221 @@ var noLogsInComponentScope = {
 };
 
 /**
+ * @fileoverview Rule to prefer log.xxx over console.xxx
+ */
+
+const MESSAGE_ID$1 = "preferLogOverConsole";
+const DEFAULT_IMPORT_SOURCE = "logbeacon";
+const DEFAULT_IMPORT_NAME = "log";
+
+const DEFAULT_METHOD_MAP = {
+  log: "debug",
+  debug: "debug",
+  info: "info",
+  warn: "warn",
+  error: "error",
+  trace: "trace"
+};
+
+/** @type {import('eslint').Rule.RuleModule} */
+var preferLogOverConsole = {
+  meta: {
+    type: "suggestion",
+    docs: {
+      description: "建议使用 log.xxx 而不是 console.xxx",
+      category: "Best Practices",
+      recommended: true,
+    },
+    fixable: "code",
+    schema: [
+      {
+        type: "object",
+        properties: {
+          importSource: { type: "string" },
+          importName: { type: "string" },
+          methodMap: {
+            type: "object",
+            additionalProperties: { type: "string" }
+          }
+        },
+        additionalProperties: false
+      }
+    ],
+    messages: {
+      [MESSAGE_ID$1]: `请使用 log 对象进行日志输出，支持的方法有: 
+- log.trace————用来跟踪代码执行流程、用户行为
+- log.debug————用来调试代码
+- log.info————用来记录一般信息
+- log.warn————用来记录警告信息
+- log.error————用来记录错误信息`
+    },
+  },
+  create(context) {
+    const options = context.options[0] || {};
+    const importSource = options.importSource || DEFAULT_IMPORT_SOURCE;
+    const importName = options.importName || DEFAULT_IMPORT_NAME;
+    const methodMap = { ...DEFAULT_METHOD_MAP, ...(options.methodMap || {}) };
+    
+    // 跟踪导入状态
+    let importInfo = {
+      hasImport: false,
+      lastImportNode: null,
+      isESM: true // 默认假设是ESM
+    };
+    
+    // 检查是否有解构赋值的console
+    let destructuredConsole = new Set();
+    
+    return {
+      // 检查导入语句
+      ImportDeclaration(node) {
+        if (node.source.value === importSource) {
+          const hasDefaultImport = node.specifiers.some(spec => 
+            spec.type === "ImportDefaultSpecifier" && 
+            spec.local.name === importName);
+          
+          if (hasDefaultImport) {
+            importInfo.hasImport = true;
+          }
+        }
+        // 记录最后一个导入语句
+        importInfo.lastImportNode = node;
+      },
+      
+      // 检查 CommonJS require
+      "VariableDeclarator[init.callee.name='require']"(node) {
+        if (node.init.arguments[0].value === importSource) {
+          if (node.id.type === "Identifier" && node.id.name === importName) {
+            importInfo.hasImport = true;
+            importInfo.isESM = false;
+          }
+        }
+      },
+      
+      // 检查console的解构赋值
+      "VariableDeclarator[init.name='console']"(node) {
+        if (node.id.type === "ObjectPattern") {
+          node.id.properties.forEach(prop => {
+            if (prop.key.name && Object.keys(methodMap).includes(prop.key.name)) {
+              destructuredConsole.add(prop.value.name);
+            }
+          });
+        }
+      },
+      
+      // 检测 console.xxx 调用
+      "CallExpression[callee.object.name='console']"(node) {
+        const method = node.callee.property.name;
+        
+        if (Object.keys(methodMap).includes(method)) {
+          context.report({
+            node,
+            messageId: MESSAGE_ID$1,
+            fix(fixer) {
+              const fixes = [];
+              
+              // 根据映射替换方法
+              const logMethod = methodMap[method];
+              fixes.push(fixer.replaceText(node.callee, `${importName}.${logMethod}`));
+              
+              // 如果需要，添加导入语句
+              if (!importInfo.hasImport) {
+                if (importInfo.lastImportNode) {
+                  // 在最后一个导入语句后添加
+                  fixes.push(
+                    fixer.insertTextAfter(
+                      importInfo.lastImportNode, 
+                      `\nimport ${importName} from "${importSource}";`
+                    )
+                  );
+                } else if (context.sourceCode.ast.body.length > 0) {
+                  // 在文件开头添加
+                  fixes.push(
+                    fixer.insertTextBefore(
+                      context.sourceCode.ast.body[0], 
+                      `import ${importName} from "${importSource}";\n\n`
+                    )
+                  );
+                }
+                importInfo.hasImport = true;
+              }
+              
+              return fixes;
+            }
+          });
+        }
+      },
+      
+      // 检测解构后的console方法调用
+      CallExpression(node) {
+        if (node.callee.type === "Identifier" && 
+            destructuredConsole.has(node.callee.name)) {
+          
+          // 找到对应的原始console方法
+          let originalMethod = null;
+          for (const [method, value] of Object.entries(methodMap)) {
+            if (node.callee.name === method) {
+              originalMethod = method;
+              break;
+            }
+          }
+          
+          if (originalMethod) {
+            context.report({
+              node,
+              messageId: MESSAGE_ID$1,
+              fix(fixer) {
+                const fixes = [];
+                
+                // 替换为log方法
+                const logMethod = methodMap[originalMethod];
+                fixes.push(fixer.replaceText(node.callee, `${importName}.${logMethod}`));
+                
+                // 如果需要，添加导入语句
+                if (!importInfo.hasImport) {
+                  if (importInfo.isESM) {
+                    if (importInfo.lastImportNode) {
+                      fixes.push(
+                        fixer.insertTextAfter(
+                          importInfo.lastImportNode, 
+                          `\nimport ${importName} from "${importSource}";`
+                        )
+                      );
+                    } else if (context.sourceCode.ast.body.length > 0) {
+                      fixes.push(
+                        fixer.insertTextBefore(
+                          context.sourceCode.ast.body[0], 
+                          `import ${importName} from "${importSource}";\n\n`
+                        )
+                      );
+                    }
+                  } else {
+                    // CommonJS 导入
+                    if (context.sourceCode.ast.body.length > 0) {
+                      fixes.push(
+                        fixer.insertTextBefore(
+                          context.sourceCode.ast.body[0], 
+                          `const ${importName} = require("${importSource}");\n\n`
+                        )
+                      );
+                    }
+                  }
+                  importInfo.hasImport = true;
+                }
+                
+                return fixes;
+              }
+            });
+          }
+        }
+      }
+    };
+  }
+};
+
+/**
  * @fileoverview Rule to require log messages start with [xxx] format
+ * 支持字符串字面量和模板字符串的自动修复，对于其他表达式类型会提示手动修复
  */
 
 const MESSAGE_ID = "requireLogMessagePrefix";
@@ -660,7 +661,7 @@ const rule = {
   meta: {
     type: "suggestion",
     docs: {
-      description: "要求日志消息以 [文案] 格式开头",
+      description: "要求日志消息以 [文案] 格式开头（支持字符串字面量和模板字符串自动修复）",
       category: "Best Practices",
       recommended: true,
     },
@@ -680,7 +681,8 @@ const rule = {
       }
     ],
     messages: {
-      [MESSAGE_ID]: '日志消息应该以 "[文案]" 格式开头，例如：log.info("[文案]用户登录成功")'
+      [MESSAGE_ID]: '日志消息应该以 "[文案]" 格式开头，例如：log.info("[文案]用户登录成功")',
+      [`${MESSAGE_ID}NoFix`]: '日志消息应该以 "[文案]" 格式开头，请手动添加前缀。支持字符串字面量和模板字符串的自动修复。'
     },
   },
   create(context) {
@@ -714,8 +716,8 @@ const rule = {
       if (typeof str !== 'string') return false;
       // 空字符串跳过检查
       if (str.length === 0) return true;
-      // 正则表达式：以[开头，中间至少有一个非空白字符，以]结尾
-      return /^\[.+?\]/.test(str) && !/^\[\s*\]/.test(str);
+      // 正则表达式：以[开头，中间可以是任何内容（包括空格），但不能是空括号，以]结尾
+      return /^\[[^\]]+\]/.test(str);
     }
     
     return {
@@ -726,11 +728,11 @@ const rule = {
         // 检查是否被忽略
         if (isIgnoredMethod(node)) return;
         
-        // 检查第一个参数
+        // 检查第一个参数 - 支持字符串字面量、模板字符串和其他表达式
         const firstArg = node.arguments[0];
         if (!firstArg) return;
         
-        // 只检查字符串字面量
+        // 处理字符串字面量
         if (firstArg.type === 'Literal' && typeof firstArg.value === 'string') {
           if (!hasValidPrefix(firstArg.value)) {
             context.report({
@@ -747,6 +749,29 @@ const rule = {
             });
           }
         }
+        // 处理模板字符串
+        else if (firstArg.type === 'TemplateLiteral') {
+          const firstQuasi = firstArg.quasis[0];
+          if (firstQuasi && !hasValidPrefix(firstQuasi.value.raw)) {
+            context.report({
+              node,
+              messageId: MESSAGE_ID,
+              fix(fixer) {
+                // 自动修复：在模板字符串的第一个quasi前添加[文案]
+                const originalCode = context.getSourceCode().getText(firstArg);
+                const newCode = originalCode.replace(/^`/, '`[文案]');
+                return fixer.replaceText(firstArg, newCode);
+              }
+            });
+          }
+        }
+        // 处理其他非字面量表达式（变量、成员表达式、二元表达式等）
+        else {
+          context.report({
+            node,
+            messageId: `${MESSAGE_ID}NoFix`
+          });
+        }
       }
     };
   }
@@ -756,16 +781,16 @@ var requireLogMessagePrefix = rule;
 
 var eslint = {
   rules: {
-    "prefer-log-over-console": preferLogOverConsole,
     "no-logs-in-component-scope": noLogsInComponentScope,
+    "prefer-log-over-console": preferLogOverConsole,
     "require-log-message-prefix": requireLogMessagePrefix
   },
   configs: {
     recommended: {
       plugins: ["logs-transform"],
       rules: {
-        "logs-transform/prefer-log-over-console": "warn",
         "logs-transform/no-logs-in-component-scope": "warn",
+        "logs-transform/prefer-log-over-console": "warn",
         "logs-transform/require-log-message-prefix": "warn"
       }
     }

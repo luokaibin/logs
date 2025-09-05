@@ -116,21 +116,21 @@ describe('require-log-message-prefix', function() {
         { code: `log.info('[UI]页面渲染完成');` },
         // 多字符的[xxx]格式
         { code: `log.info('[网络请求]获取用户数据');` },
-        { code: `log.info('[错误处理]捕获异常');` }
+        { code: `log.info('[错误处理]捕获异常');` },
+        // 支持带空格的[xxx]格式
+        { code: `log.info('[token services]认证成功');` },
+        { code: `log.info('[user auth]用户登录');` },
+        { code: `log.info('[API request]获取数据');` },
+        { code: `log.info('[error handling]异常捕获');` },
+        { code: `log.info('[  spaced prefix  ]带空格前缀');` },
+        // 支持纯空格的[xxx]格式
+        { code: `log.info('[  ]纯空格前缀');` }
       ],
       invalid: [
         // 无效的格式
         {
           code: `log.info('[]用户登录成功');`, // 空的[]
           output: `log.info('[文案][]用户登录成功');`, // 会在前面添加[文案]
-          errors: [{
-            message: '日志消息应该以 "[文案]" 格式开头，例如：log.info("[文案]用户登录成功")',
-            type: 'CallExpression'
-          }]
-        },
-        {
-          code: `log.info('[  ]用户登录成功');`, // 只有空白字符的[]
-          output: `log.info('[文案][  ]用户登录成功');`, // 会在前面添加[文案]
           errors: [{
             message: '日志消息应该以 "[文案]" 格式开头，例如：log.info("[文案]用户登录成功")',
             type: 'CallExpression'
