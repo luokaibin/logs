@@ -33,7 +33,7 @@ export async function fetchPublicIPAndRegion() {
  * 浏览器端获取/生成uuid 如果 window 不存在则返回空字符串
  * @returns {string}
  */
-export function getOrCreateUUID() {
+function getOrCreateUUID() {
   if (typeof window === "undefined") return "";
   const key = "_client_uuid";
   let uuid = window.localStorage.getItem(key);
@@ -177,7 +177,8 @@ export async function sendLog(level, logs) {
   sendEvent(msg);  
 }
 
-export const logFilter = {
+// 扩展loglevel，添加关键词过滤功能
+export const extendLoglevel = {
   setKeyWords(keyWords) {
     if (typeof window === "undefined") return;
     if (typeof keyWords !== "string") return;
@@ -187,5 +188,6 @@ export const logFilter = {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem("_logFilterKeyWords");
   },
+  getOrCreateUUID,
 }
 

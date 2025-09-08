@@ -1,5 +1,19 @@
 import crypto from 'crypto';
 import { gunzipSync } from 'fflate'
+import Pbf from 'pbf';
+import { readLogGroup } from './sls';
+
+/**
+ * 解码日志数据
+ * @param {Uint8Array} payload - 已经序列化的日志数据
+ * @returns {Object} - 解码后的日志对象
+ */
+export const decodeLogs = (payload) => {
+  const body = gunzipSync(payload);
+  const pbf = new Pbf(body);
+  const logGroup = readLogGroup(pbf);
+  return logGroup;
+};
 
 /**
  * 创建阿里云日志服务客户端

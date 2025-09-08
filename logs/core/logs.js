@@ -1,5 +1,5 @@
 import loglevel from "loglevel";
-import { sendLog, logFilter } from "../common/utils.js";
+import { sendLog, extendLoglevel } from "../common/utils.js";
 
 const LOG_METHODS = ["trace", "debug", "info", "warn", "error"];
 
@@ -9,9 +9,6 @@ const proxyLoglevelFn = (fn, fnName) => {
     apply: (target, thisArg, argumentsList) => {
       if (!LOG_METHODS.includes(fnName)) {
         return target.apply(thisArg, argumentsList);
-      }
-      if (fnName === 'setKeyWords') {
-        return logFilter.setKeyWords(argumentsList[0]);
       }
       if (typeof window !== "undefined") {
         sendLog(fnName, argumentsList);
@@ -36,6 +33,9 @@ const log = new Proxy(loglevel, {
     const orig = target[prop];
     if (typeof orig === 'function') {
       return proxyLoglevelFn(orig, prop);
+    }
+    if (Object.keys(extendLoglevel).includes(prop)) {
+      return extendLoglevel[prop];
     }
     return orig;
   }

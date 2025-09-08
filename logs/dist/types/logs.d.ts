@@ -15,6 +15,11 @@ export interface EnhancedLogger extends Logger {
    * @returns 当前设置的过滤关键词，如果未设置则返回 null
    */
   getKeyWords(): string | null;
+  /**
+   * 获取/生成uuid 如果 window 不存在则返回空字符串
+   * @returns {string}
+   */
+  getOrCreateUUID(): string;
 }
 
 /**

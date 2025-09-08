@@ -17,6 +17,43 @@ const ARRAY_SAMPLING_CONFIG = {
 // 序列化后日志字符串的最大长度
 const MAX_LOG_LENGTH = 100000;
 
+// 策略模式：为浏览器环境中的特定对象类型定义专门的处理器
+const browserTypeHandlers = new Map();
+if (typeof window !== 'undefined') {
+  // ErrorEvent 处理器
+  browserTypeHandlers.set(window.ErrorEvent, (value, options, currentDepth, seen) => ({
+    _t: 'ErrorEvent',
+    message: value.message,
+    filename: value.filename,
+    lineno: value.lineno,
+    colno: value.colno,
+    error: serializeSingleValue(value.error, options, currentDepth + 1, seen),
+  }));
+
+  // PromiseRejectionEvent 处理器
+  browserTypeHandlers.set(window.PromiseRejectionEvent, (value, options, currentDepth, seen) => ({
+    _t: 'PromiseRejectionEvent',
+    reason: serializeSingleValue(value.reason, options, currentDepth + 1, seen),
+  }));
+
+  // MessageEvent 处理器
+  browserTypeHandlers.set(window.MessageEvent, (value, options, currentDepth, seen) => ({
+    _t: 'MessageEvent',
+    data: serializeSingleValue(value.data, options, currentDepth + 1, seen),
+    origin: value.origin,
+    lastEventId: value.lastEventId,
+    source: '[WindowProxy]', // source 是一个 window proxy, 不能直接序列化
+  }));
+
+  // CloseEvent 处理器
+  browserTypeHandlers.set(window.CloseEvent, (value, options, currentDepth, seen) => ({
+    _t: 'CloseEvent',
+    code: value.code,
+    reason: value.reason,
+    wasClean: value.wasClean,
+  }));
+}
+
 /**
  * 将任何 JavaScript 内容序列化为截断后的 JSON 字符串。
  * @param {any} content - 需要序列化的内容。
@@ -94,6 +131,13 @@ function serializeSingleValue(
   }
 
   // 处理特殊对象类型
+  // 检查是否有专门的类型处理器（策略模式）
+  for (const [typeConstructor, handler] of browserTypeHandlers.entries()) {
+    if (value instanceof typeConstructor) {
+      return handler(value, options, currentDepth, seen);
+    }
+  }
+
   if (value instanceof Error) {
     return `${value.name}: ${value.message}\nStack: ${value.stack || ''}`;
   }

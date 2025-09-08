@@ -25,3 +25,46 @@ export function createLogClient(
  * @returns HTTP 响应对象
  */
 export type SendLogsFunction = (payload: Uint8Array) => Promise<Response>;
+
+/**
+ * 日志内容，键值对
+ */
+export interface SlsLogContent {
+  Key: string;
+  Value: string;
+}
+
+/**
+ * 单条日志
+ */
+export interface SlsLog {
+  Time: number; // uint32
+  Contents: SlsLogContent[];
+  TimeNs?: number; // optional fixed32
+}
+
+/**
+ * 日志标签
+ */
+export interface SlsLogTag {
+  Key: string;
+  Value: string;
+}
+
+/**
+ * 日志组，是发送到SLS的单位
+ */
+export interface SlsLogGroup {
+  Logs: SlsLog[];
+  Reserved?: string; // optional
+  Topic?: string; // optional
+  Source?: string; // optional
+  LogTags?: SlsLogTag[]; // optional
+}
+
+/**
+ * 解码通过 sendLogs 发送的 payload
+ * @param payload - 经过 gzip 压缩和 Protobuf 序列化的日志数据
+ * @returns 解码后的日志组对象
+ */
+export function decodeLogs(payload: Uint8Array): SlsLogGroup;
