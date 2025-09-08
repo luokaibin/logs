@@ -16,7 +16,7 @@ const proxyLoglevelFn = (fn, fnName) => {
       if (typeof argumentsList[0] !== "string") {
         return target.apply(thisArg, argumentsList);
       }
-      const keyWords = logFilter.getKeyWords();
+      const keyWords = extendLoglevel.getKeyWords();
       if (!keyWords) {
         return target.apply(thisArg, argumentsList);
       }
