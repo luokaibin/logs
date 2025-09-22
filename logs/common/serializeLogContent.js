@@ -52,6 +52,55 @@ if (typeof window !== 'undefined') {
     reason: value.reason,
     wasClean: value.wasClean,
   }));
+
+  // CustomEvent 处理器
+  browserTypeHandlers.set(window.CustomEvent, (value, options, currentDepth, seen) => ({
+    _t: 'CustomEvent',
+    type: value.type,
+    detail: serializeSingleValue(value.detail, options, currentDepth + 1, seen),
+    bubbles: value.bubbles,
+    cancelable: value.cancelable,
+    composed: value.composed,
+  }));
+
+  // KeyboardEvent 处理器
+  browserTypeHandlers.set(window.KeyboardEvent, (value, options, currentDepth, seen) => ({
+    _t: 'KeyboardEvent',
+    type: value.type,
+    key: value.key,
+    code: value.code,
+    ctrlKey: value.ctrlKey,
+    shiftKey: value.shiftKey,
+    altKey: value.altKey,
+    metaKey: value.metaKey,
+    repeat: value.repeat,
+    bubbles: value.bubbles,
+    cancelable: value.cancelable,
+  }));
+
+  // InputEvent 处理器
+  browserTypeHandlers.set(window.InputEvent, (value, options, currentDepth, seen) => ({
+    _t: 'InputEvent',
+    type: value.type,
+    inputType: value.inputType,
+    data: value.data,
+    isComposing: value.isComposing,
+    bubbles: value.bubbles,
+    cancelable: value.cancelable,
+  }));
+
+  // StorageEvent 处理器
+  browserTypeHandlers.set(window.StorageEvent, (value, options, currentDepth, seen) => ({
+    _t: 'StorageEvent',
+    type: value.type,
+    key: value.key,
+    newValue: value.newValue,
+    oldValue: value.oldValue,
+    url: value.url,
+    storageArea: '[Storage]', // storageArea 是 Storage 对象，不能直接序列化
+    bubbles: value.bubbles,
+    cancelable: value.cancelable,
+  }));
 }
 
 /**
