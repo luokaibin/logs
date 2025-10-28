@@ -91,7 +91,7 @@
     "idb": "^8.0.3",
     "loglevel": "^1.9.2",
     "pbf": "^4.0.1",
-    "ua-parser-js": "^2.0.3"
+    "ua-parser-js": "^2.0.6"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^24.0.0",
