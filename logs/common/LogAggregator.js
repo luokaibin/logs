@@ -4,7 +4,7 @@
  */
 
 import { META_KEYS } from './constants.js';
-import { isSameDay } from './utils.js';
+import { isSameDay, generateRandomPrefix } from './utils.js';
 import {gzipSync} from "fflate"
 import {LogProcessor} from './LogProcessor.js';
 
@@ -100,30 +100,6 @@ export class LogAggregator extends LogProcessor {
     this._beaconUrl = null;
   }
   
-  /** 
-   * 生成日志上下文前缀
-   * @private
-   * @returns {string}
-   */
-  static _generateLogContextPrefix() {
-    let uuid;
-      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        uuid = crypto.randomUUID();
-      } else {
-        // 生成 16 字节的随机十六进制字符串
-        const hexChars = '0123456789ABCDEF';
-        uuid = '';
-        for (let i = 0; i < 32; i++) {
-          uuid += hexChars[Math.floor(Math.random() * 16)];
-        }
-      }
-      return uuid.replace(/-/g, '').toUpperCase().substring(0, 16);
-  }
-  /**
-   * 生成日志上下文
-   * @private
-   * @returns {Promise<string>}
-   */
   /**
    * 获取 beaconUrl
    * @private
@@ -190,7 +166,7 @@ export class LogAggregator extends LogProcessor {
       return this._logContext;
     }
 
-    prefix = LogAggregator._generateLogContextPrefix();
+    prefix = generateRandomPrefix();
     logGroupId = 1;
     this._logContext = `${prefix}-${logGroupId.toString(16).toUpperCase()}`;
     this.setMeta(META_KEYS.LOG_CONTEXT, this._logContext);

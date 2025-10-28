@@ -30,6 +30,25 @@ export async function fetchPublicIPAndRegion() {
 }
 
 /**
+ * 生成随机前缀字符串（16位大写十六进制）
+ * @returns {string}
+ */
+export function generateRandomPrefix() {
+  let uuid;
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    uuid = crypto.randomUUID();
+  } else {
+    // 生成 16 字节的随机十六进制字符串
+    const hexChars = '0123456789ABCDEF';
+    uuid = '';
+    for (let i = 0; i < 32; i++) {
+      uuid += hexChars[Math.floor(Math.random() * 16)];
+    }
+  }
+  return uuid.replace(/-/g, '').toUpperCase().substring(0, 16);
+}
+
+/**
  * 浏览器端获取/生成uuid 如果 window 不存在则返回空字符串
  * @returns {string}
  */
@@ -48,6 +67,21 @@ function getOrCreateUUID() {
     }
   }
   return uuid;
+}
+
+/**
+ * 浏览器端获取/生成tabId 如果 window 不存在则返回空字符串
+ * @returns {string}
+ */
+function getOrCreateTabId() {
+  if (typeof window === "undefined") return "";
+  const key = "_tab_id";
+  let tabId = window.sessionStorage.getItem(key);
+  if (!tabId) {
+    tabId = generateRandomPrefix();
+    window.sessionStorage.setItem(key, tabId);
+  }
+  return tabId;
 }
 
 /**
@@ -73,6 +107,16 @@ export function getLogExtraInfo() {
   if (typeof window === "undefined" || typeof window.document === "undefined") {
     return {};
   }
+  // 过滤扩展属性，只保留有效的字符串值
+  const filteredContext = {};
+  if (window.LOGS_CONTEXT && typeof window.LOGS_CONTEXT === 'object') {
+    for (const [key, value] of Object.entries(window.LOGS_CONTEXT)) {
+      if (typeof value === 'string' && value.trim().length > 0) {
+        filteredContext[key] = value;
+      }
+    }
+  }
+
   const base = {
     time: Date.now(),
     clientUuid: getOrCreateUUID(),
@@ -81,6 +125,8 @@ export function getLogExtraInfo() {
     window: JSON.stringify(serializeSingleValue({ width: window.innerWidth, height: window.innerHeight })),
     url: window.location.href,
     referrer: document.referrer,
+    tabId: getOrCreateTabId(),
+    ...filteredContext,
   };
   return base;
 }

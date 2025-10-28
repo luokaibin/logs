@@ -377,6 +377,7 @@ sequenceDiagram
 | level      | 日志级别；"trace"  "debug"  "info"  "warn"  "error"          |
 | content    | 序列化之后的日志内容                                         |
 | clientUuid | 客户端的唯一ID，存储在localStorage中                         |
+| tabId      | 浏览器标签页的唯一ID，存储在sessionStorage中，用于区分不同标签页的日志 |
 | userAgent  | 浏览器的userAgent信息，使用UAParser进行解析                  |
 | screen     | 用户的屏幕宽高                                               |
 | window     | 用户的浏览器可视窗口宽高                                     |
@@ -384,6 +385,85 @@ sequenceDiagram
 | referrer   | 页面来源 URL (`document.referrer`)                             |
 | ip         | 用户的公网IP（每天更新一次）                                 |
 | region     | 用户的地理位置（国家/地区）                                  |
+
+### 标签页标识 (tabId)
+
+系统会自动为每个浏览器标签页生成唯一的 `tabId`，用于区分不同标签页的日志：
+
+- **生成方式**：使用16位大写十六进制随机字符串
+- **存储位置**：存储在 `sessionStorage` 中
+- **生命周期**：标签页关闭后重新打开会生成新的 `tabId`
+- **用途**：当用户同时打开多个标签页时，可以通过 `tabId` 字段对日志进行分组分析
+
+**使用场景**：
+- 多标签页环境下的日志分析
+- 用户行为轨迹追踪
+- 标签页级别的错误监控
+
+**示例**：
+```javascript
+// 不同标签页的日志会有不同的 tabId
+// 标签页1的日志
+{ tabId: 'A1B2C3D4E5F67890', url: 'https://example.com/page1', ... }
+
+// 标签页2的日志  
+{ tabId: 'B2C3D4E5F6789012', url: 'https://example.com/page2', ... }
+```
+
+## 扩展基础属性
+
+系统支持扩展日志的基础属性，允许您添加自定义的上下文信息。
+
+### 使用方法
+
+在页面中设置 `window.LOGS_CONTEXT` 对象，系统会自动将这些属性合并到每条日志的基础数据中：
+
+```javascript
+// 设置扩展属性
+window.LOGS_CONTEXT = {
+  pageType: 'news/:id',        // 页面类型（归类后的路径）
+  userId: '12345',             // 用户ID
+  sessionId: 'abc-def-ghi',    // 会话ID
+  userRole: 'admin',           // 用户角色
+  environment: 'production'    // 环境标识
+};
+
+// 正常使用日志记录
+log.info('用户操作', { action: 'click' });
+```
+
+### 示例效果
+
+设置扩展属性后，每条日志都会自动包含这些信息：
+
+```javascript
+// 日志数据示例
+{
+  // 系统基础属性
+  time: 1760525710873,
+  clientUuid: '...',
+  tabId: 'A1B2C3D4E5F67890',  // 标签页唯一ID
+  userAgent: '...',
+  screen: '...',
+  window: '...',
+  url: 'https://example.com/news/123',
+  referrer: '...',
+  
+  // 扩展属性
+  pageType: 'news/:id',
+  userId: '12345',
+  sessionId: 'abc-def-ghi',
+  userRole: 'admin',
+  environment: 'production'
+}
+```
+
+### 注意事项
+
+- 扩展属性会与系统基础属性合并，如果属性名冲突，扩展属性会覆盖系统属性
+- 建议使用有意义的属性名，避免与系统属性冲突
+- **扩展属性的值必须是有效的字符串**（非空字符串），非字符串值会被自动过滤掉
+- 如果不设置 `window.LOGS_CONTEXT`，系统行为与之前完全一致
 
 ## ESLint 插件
 
