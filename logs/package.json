@@ -1,6 +1,6 @@
 {
   "name": "logbeacon",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "type": "module",
   "module": "dist/core/logs.js",
   "description": "浏览器端日志采集与上报工具，支持多种日志服务后端，包括阿里云日志服务(SLS)和Grafana Loki",

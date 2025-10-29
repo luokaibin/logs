@@ -13,8 +13,16 @@ export default function logEncoder(logs, ctxId) {
     const values = logs.map(item => {
       // Loki 需要纳秒级时间戳字符串
       const ts = (item.time ? (item.time * 1e6) : (Date.now() * 1e6)).toString();
-      // message内容建议为字符串，这里直接序列化整个item
-      return [ts, JSON.stringify(item)];
+      
+      // 展开 extendedAttributes 到顶层
+      const flattened = { ...item };
+      if (item.extendedAttributes && typeof item.extendedAttributes === 'object') {
+        Object.assign(flattened, item.extendedAttributes);
+        delete flattened.extendedAttributes;
+      }
+      
+      // message内容建议为字符串，这里直接序列化展开后的item
+      return [ts, JSON.stringify(flattened)];
     }).filter(item => item.length === 2 && item[0] && item[1]?.trim()?.length);
     if (!values?.length) return;
     const lokiPayload = {

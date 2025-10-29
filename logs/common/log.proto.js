@@ -11,7 +11,7 @@ export function writeLogBatch(obj, pbf) {
 }
 
 export function readLogItem(pbf, end) {
-    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", userAgent: "", screen: "", window: "", url: "", ip: "", region: "", referrer: ""}, end);
+    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", userAgent: "", screen: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}}, end);
 }
 function readLogItemField(tag, obj, pbf) {
     if (tag === 1) obj.time = pbf.readVarint(true);
@@ -25,6 +25,8 @@ function readLogItemField(tag, obj, pbf) {
     else if (tag === 9) obj.ip = pbf.readString();
     else if (tag === 10) obj.region = pbf.readString();
     else if (tag === 11) obj.referrer = pbf.readString();
+    else if (tag === 12) obj.sessionId = pbf.readString();
+    else if (tag === 13) { const {key, value} = readLogItem_FieldEntry13(pbf, pbf.readVarint() + pbf.pos); obj.extendedAttributes[key] = value; }
 }
 export function writeLogItem(obj, pbf) {
     if (obj.time) pbf.writeVarintField(1, obj.time);
@@ -38,4 +40,18 @@ export function writeLogItem(obj, pbf) {
     if (obj.ip) pbf.writeStringField(9, obj.ip);
     if (obj.region) pbf.writeStringField(10, obj.region);
     if (obj.referrer) pbf.writeStringField(11, obj.referrer);
+    if (obj.sessionId) pbf.writeStringField(12, obj.sessionId);
+    if (obj.extendedAttributes) for (const key of Object.keys(obj.extendedAttributes)) pbf.writeMessage(13, writeLogItem_FieldEntry13, {key, value: obj.extendedAttributes[key]});
+}
+
+export function readLogItem_FieldEntry13(pbf, end) {
+    return pbf.readFields(readLogItem_FieldEntry13Field, {key: "", value: ""}, end);
+}
+function readLogItem_FieldEntry13Field(tag, obj, pbf) {
+    if (tag === 1) obj.key = pbf.readString();
+    else if (tag === 2) obj.value = pbf.readString();
+}
+export function writeLogItem_FieldEntry13(obj, pbf) {
+    if (obj.key) pbf.writeStringField(1, obj.key);
+    if (obj.value) pbf.writeStringField(2, obj.value);
 }

@@ -25,10 +25,17 @@ export default function logEncoder(logs, ctxId) {
     Logs: logs.map(log => {
       const { time, ...rest } = log;
       
+      // 展开 extendedAttributes 到顶层
+      const flattened = { ...rest };
+      if (rest.extendedAttributes && typeof rest.extendedAttributes === 'object') {
+        Object.assign(flattened, rest.extendedAttributes);
+        delete flattened.extendedAttributes;
+      }
+      
       // 创建日志内容
       const logPayload = {
         Time: Math.floor(time / 1000),
-        Contents: Object.entries(rest).reduce((acc, [Key, Value]) => {
+        Contents: Object.entries(flattened).reduce((acc, [Key, Value]) => {
           // 卫语句：Key 必须有效，Value 不能是 null 或 undefined
           if (!Key || Value === null || Value === undefined || Value === '') {
             return acc;

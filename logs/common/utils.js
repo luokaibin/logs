@@ -70,18 +70,18 @@ function getOrCreateUUID() {
 }
 
 /**
- * 浏览器端获取/生成tabId 如果 window 不存在则返回空字符串
+ * 浏览器端获取/生成sessionId 如果 window 不存在则返回空字符串
  * @returns {string}
  */
-function getOrCreateTabId() {
+function getOrCreateSessionId() {
   if (typeof window === "undefined") return "";
-  const key = "_tab_id";
-  let tabId = window.sessionStorage.getItem(key);
-  if (!tabId) {
-    tabId = generateRandomPrefix();
-    window.sessionStorage.setItem(key, tabId);
+  const key = "_session_id";
+  let sessionId = window.sessionStorage.getItem(key);
+  if (!sessionId) {
+    sessionId = generateRandomPrefix();
+    window.sessionStorage.setItem(key, sessionId);
   }
-  return tabId;
+  return sessionId;
 }
 
 /**
@@ -108,11 +108,11 @@ export function getLogExtraInfo() {
     return {};
   }
   // 过滤扩展属性，只保留有效的字符串值
-  const filteredContext = {};
+  const extendedAttributes = {};
   if (window.LOGS_CONTEXT && typeof window.LOGS_CONTEXT === 'object') {
     for (const [key, value] of Object.entries(window.LOGS_CONTEXT)) {
       if (typeof value === 'string' && value.trim().length > 0) {
-        filteredContext[key] = value;
+        extendedAttributes[key] = value;
       }
     }
   }
@@ -125,8 +125,8 @@ export function getLogExtraInfo() {
     window: JSON.stringify(serializeSingleValue({ width: window.innerWidth, height: window.innerHeight })),
     url: window.location.href,
     referrer: document.referrer,
-    tabId: getOrCreateTabId(),
-    ...filteredContext,
+    sessionId: getOrCreateSessionId(),
+    extendedAttributes,
   };
   return base;
 }

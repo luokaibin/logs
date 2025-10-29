@@ -16,4 +16,6 @@ message LogItem {
   string ip = 9;
   string region = 10;
   string referrer = 11;
+  string sessionId = 12;
+  map<string, string> extendedAttributes = 13;
 }

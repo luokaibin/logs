@@ -24,6 +24,7 @@ import {LogProcessor} from './LogProcessor.js';
  * @property {"trace"|"debug"|"info"|"warn"|"error"} level - 日志等级
  * @property {string} content - 日志内容
  * @property {string} clientUuid - 客户端唯一ID
+ * @property {string} sessionId - 浏览器会话唯一ID，存储在sessionStorage中
  * @property {string} referrer - 当前页面的 referrer
  * @property {UserAgentInfo} userAgent - 解析后的 userAgent 信息
  * @property {{width: number, height: number}} screen - 屏幕宽高
@@ -31,6 +32,7 @@ import {LogProcessor} from './LogProcessor.js';
  * @property {string} url - 当前页面url
  * @property {string} ip - 公网IP
  * @property {string} region - 公网IP所在地区
+ * @property {Object.<string, string>} [extendedAttributes] - 外部扩展的基础属性，key-value均为字符串
  */
 
 /**

@@ -377,7 +377,7 @@ sequenceDiagram
 | level      | 日志级别；"trace"  "debug"  "info"  "warn"  "error"          |
 | content    | 序列化之后的日志内容                                         |
 | clientUuid | 客户端的唯一ID，存储在localStorage中                         |
-| tabId      | 浏览器标签页的唯一ID，存储在sessionStorage中，用于区分不同标签页的日志 |
+| sessionId  | 浏览器会话的唯一ID，存储在sessionStorage中，用于区分不同标签页的日志 |
 | userAgent  | 浏览器的userAgent信息，使用UAParser进行解析                  |
 | screen     | 用户的屏幕宽高                                               |
 | window     | 用户的浏览器可视窗口宽高                                     |
@@ -386,14 +386,14 @@ sequenceDiagram
 | ip         | 用户的公网IP（每天更新一次）                                 |
 | region     | 用户的地理位置（国家/地区）                                  |
 
-### 标签页标识 (tabId)
+### 会话标识 (sessionId)
 
-系统会自动为每个浏览器标签页生成唯一的 `tabId`，用于区分不同标签页的日志：
+系统会自动为每个浏览器标签页生成唯一的 `sessionId`，用于区分不同标签页的日志：
 
 - **生成方式**：使用16位大写十六进制随机字符串
 - **存储位置**：存储在 `sessionStorage` 中
-- **生命周期**：标签页关闭后重新打开会生成新的 `tabId`
-- **用途**：当用户同时打开多个标签页时，可以通过 `tabId` 字段对日志进行分组分析
+- **生命周期**：标签页关闭后重新打开会生成新的 `sessionId`
+- **用途**：当用户同时打开多个标签页时，可以通过 `sessionId` 字段对日志进行分组分析
 
 **使用场景**：
 - 多标签页环境下的日志分析
@@ -402,12 +402,12 @@ sequenceDiagram
 
 **示例**：
 ```javascript
-// 不同标签页的日志会有不同的 tabId
+// 不同标签页的日志会有不同的 sessionId
 // 标签页1的日志
-{ tabId: 'A1B2C3D4E5F67890', url: 'https://example.com/page1', ... }
+{ sessionId: 'A1B2C3D4E5F67890', url: 'https://example.com/page1', ... }
 
 // 标签页2的日志  
-{ tabId: 'B2C3D4E5F6789012', url: 'https://example.com/page2', ... }
+{ sessionId: 'B2C3D4E5F6789012', url: 'https://example.com/page2', ... }
 ```
 
 ## 扩展基础属性
@@ -442,7 +442,7 @@ log.info('用户操作', { action: 'click' });
   // 系统基础属性
   time: 1760525710873,
   clientUuid: '...',
-  tabId: 'A1B2C3D4E5F67890',  // 标签页唯一ID
+  sessionId: 'A1B2C3D4E5F67890',  // 会话唯一ID
   userAgent: '...',
   screen: '...',
   window: '...',
