@@ -150,6 +150,40 @@ export const generateLog = () => {
           logProcessor.insertLog(e.detail.payload);
         }
       });
+
+      // 监听外部全局脚本的事件，用于日志上报
+      window.addEventListener('logbeacon:log', function(e) {
+        try {
+          const { level, logs } = e.detail || {};
+          if (!level || !Array.isArray(logs)) {
+            console.warn('[logbeacon] Invalid logbeacon:log event format. Expected: { level: string, logs: array }');
+            return;
+          }
+
+          // 验证 level 是否为有效的日志级别
+          const validLevels = ['trace', 'debug', 'info', 'warn', 'error'];
+          if (!validLevels.includes(level)) {
+            console.warn(`[logbeacon] Invalid log level: ${level}. Valid levels: ${validLevels.join(', ')}`);
+            return;
+          }
+
+          // 获取日志上下文信息和序列化日志内容
+          const extraInfo = getLogExtraInfo();
+          const content = serializeLogContent(logs);
+          
+          // 构造日志 payload
+          const payload = {
+            level,
+            content,
+            ...extraInfo
+          };
+
+          // 发送到 Service Worker 或内部事件系统
+          sendSWEvent({ type: 'log', payload });
+        } catch (error) {
+          console.error('[logbeacon] Error processing logbeacon:log event:', error);
+        }
+      });
     }
   }
 

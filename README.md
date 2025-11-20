@@ -80,10 +80,61 @@ log.info('用户操作', {
 });
 ```
 
+#### 2. 通过自定义事件上报日志
+
+除了直接使用 `log` 对象记录日志外，您还可以通过触发自定义事件 `logbeacon:log` 来上报日志。这种方式特别适合在以下场景中使用：
+
+- 第三方脚本需要上报日志，但无法直接导入 `logs` 模块
+- 需要在全局范围内统一处理日志上报
+- 需要与其他日志系统集成
+
+**使用方法**：
+
+```javascript
+// 触发 logbeacon:log 自定义事件
+window.dispatchEvent(new CustomEvent('logbeacon:log', {
+  detail: {
+    level: 'info',  // 日志级别：'trace', 'debug', 'info', 'warn', 'error'
+    logs: ['用户操作', { userId: '12345', action: 'click' }]  // 日志内容数组
+  }
+}));
+
+// 示例：上报错误日志
+window.dispatchEvent(new CustomEvent('logbeacon:log', {
+  detail: {
+    level: 'error',
+    logs: ['支付失败', { orderId: '67890', error: 'Insufficient balance' }]
+  }
+}));
+
+// 示例：在全局错误处理中使用
+window.addEventListener('error', (e) => {
+  window.dispatchEvent(new CustomEvent('logbeacon:log', {
+    detail: {
+      level: 'error',
+      logs: [e.message, e.filename, e.lineno]
+    }
+  }));
+});
+```
+
+**事件格式**：
+
+- **事件名称**：`logbeacon:log`
+- **detail 对象**：
+  - `level` (string, 必需)：日志级别，必须是 `'trace'`, `'debug'`, `'info'`, `'warn'`, `'error'` 之一
+  - `logs` (array, 必需)：日志内容数组，可以包含任意类型的数据
+
+**注意事项**：
+
+- 确保在触发事件前已经引入了 `beacon.js` 脚本
+- 如果事件格式不正确（缺少必需字段或 level 值无效），系统会在控制台输出警告信息，但不会抛出错误
+- 通过自定义事件上报的日志会自动获取当前页面的上下文信息（如 URL、UserAgent 等），与直接使用 `log` 对象记录的日志行为一致
+
 **服务端修改默认日志级别 (通过环境变量)**:
 在 Node.js 环境中，您可以通过设置 `LOGS_LEVEL` 环境变量来覆盖模块加载时设置的默认 `TRACE` 级别。支持的级别同 `loglevel` 库（`trace`, `debug`, `info`, `warn`, `error`, `silent`）。
 
-#### 2. 集成 Service Worker
+#### 3. 集成 Service Worker
 
 要启用 Service Worker 处理日志，需要将相关文件复制到项目的公共目录，并在页面中引入 beacon.js 脚本：
 
@@ -118,7 +169,7 @@ export default function RootLayout({ children }) {
 
 > **注意**: 不需要手动注册 Service Worker，beacon.js 会自动处理注册过程。Service Worker 会自动监听页面状态变化、错误事件和未处理的 Promise 异常。
 
-#### 3. (可选) 配置日志上报地址
+#### 4. (可选) 配置日志上报地址
 
 默认情况下，日志数据会被发送到 `/api/beacon` 接口。您可以通过在引入 `beacon.js` 的 `<script>` 标签上添加 `data-beacon-url` 属性来自定义上报地址。
 
