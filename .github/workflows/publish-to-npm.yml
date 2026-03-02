@@ -8,6 +8,10 @@ on:
 jobs:
   publish-to-npm:
     runs-on: ubuntu-latest
+    # 关键：添加权限以允许 OIDC 身份验证
+    permissions:
+      id-token: write
+      contents: read
     steps:
       # 1. 拉取代码
       - name: Checkout repository
@@ -17,7 +21,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 10 # 你可以指定 pnpm 版本
+          version: 10.6.5 # 与 packageManager 字段保持一致
 
       # 3. 设置 Node.js 环境，并启用 pnpm 缓存
       - name: Setup Node.js
@@ -38,7 +42,7 @@ jobs:
 
       # 6. 发布到 npm (在 logs 目录内)
       - name: Publish to npm
+        # 关键：不再需要使用 secrets.NPM_TOKEN
+        # npm CLI (11.5.1+) 会自动检测 OIDC 环境进行发布
         run: pnpm publish --no-git-checks --access public
         working-directory: ./logs
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

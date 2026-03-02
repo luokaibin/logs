@@ -49,6 +49,40 @@ export function generateRandomPrefix() {
 }
 
 /**
+ * 生成符合标准UUID v4格式的UUID（fallback方案）
+ * @returns {string} 标准UUID v4格式字符串，如：xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+ */
+function generateUUIDv4() {
+  // UUID v4格式：xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  // 其中第13个字符必须是'4'（版本号），第17个字符必须是'8','9','a'或'b'（变体）
+  const hexChars = '0123456789abcdef';
+  let uuid = '';
+  
+  // 生成32个十六进制字符
+  for (let i = 0; i < 32; i++) {
+    if (i === 12) {
+      // 第13个字符（索引12）必须是'4'（版本号）
+      uuid += '4';
+    } else if (i === 16) {
+      // 第17个字符（索引16）必须是'8','9','a'或'b'（变体）
+      uuid += hexChars[8 + Math.floor(Math.random() * 4)]; // 8, 9, a, b
+    } else {
+      // 其他位置生成随机十六进制字符
+      uuid += hexChars[Math.floor(Math.random() * 16)];
+    }
+  }
+  
+  // 按照标准格式添加连字符：8-4-4-4-12
+  return [
+    uuid.substring(0, 8),
+    uuid.substring(8, 12),
+    uuid.substring(12, 16),
+    uuid.substring(16, 20),
+    uuid.substring(20, 32)
+  ].join('-');
+}
+
+/**
  * 浏览器端获取/生成uuid 如果 window 不存在则返回空字符串
  * @returns {string}
  */
@@ -61,8 +95,8 @@ function getOrCreateUUID() {
       uuid = window.crypto.randomUUID();
       window.localStorage.setItem(key, uuid);
     } else {
-      // fallback简单uuid
-      uuid = Math.random().toString(36).substring(2) + Date.now().toString(36);
+      // fallback生成标准UUID v4格式
+      uuid = generateUUIDv4();
       window.localStorage.setItem(key, uuid);
     }
   }
