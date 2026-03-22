@@ -25,5 +25,5 @@
   "homepage": "https://github.com/luokaibin/logs#readme",
   "devDependencies": {
   },
-  "packageManager": "pnpm@10.6.5"
+  "packageManager": "pnpm@10.32.1"
 }

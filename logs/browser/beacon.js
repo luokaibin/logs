@@ -36,6 +36,9 @@ export const generateLog = () => {
           type: 'module',
           scope: '/beacon/' // 明确指定作用域
         }).then(async (registration) => {
+          // 每次页面加载主动请求浏览器检查 SW 脚本是否有更新（异步，对首屏影响可忽略）
+          registration.update().catch(() => {});
+
           if (registration.active) {
             initInfo.serviceWorker = registration.active
           } else {
@@ -182,6 +185,15 @@ export const generateLog = () => {
           sendSWEvent({ type: 'log', payload });
         } catch (error) {
           console.error('[logbeacon] Error processing logbeacon:log event:', error);
+        }
+      });
+
+      // 监听外部全局脚本：主动触发一次日志上报（与 visibility 中 sendSWEvent 投递方式一致）
+      window.addEventListener('logbeacon:flush', function() {
+        try {
+          sendSWEvent({ type: 'flush-now' });
+        } catch (error) {
+          console.error('[logbeacon] Error processing logbeacon:flush event:', error);
         }
       });
     }

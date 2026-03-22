@@ -21,7 +21,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 10.6.5 # 与 packageManager 字段保持一致
+          version: 10.32.1 # 与 packageManager 字段保持一致
 
       # 3. 设置 Node.js 环境，并启用 pnpm 缓存
       - name: Setup Node.js

@@ -316,7 +316,7 @@ export class LogAggregator extends LogProcessor {
   /**
    * 分类处理事件
    * @param {Object} event - 事件对象
-   * @param {"log"|"page-load"|"page-visible"|"page-unload"|"page-hidden"} event.type - 事件类型
+   * @param {"log"|"page-load"|"page-visible"|"page-unload"|"page-hidden"|"flush-now"} event.type - 事件类型；flush-now 表示强制上报或外部主动要求立即上报
    * @param {any} event.payload - 事件负载
    */
   
@@ -336,6 +336,7 @@ export class LogAggregator extends LogProcessor {
         break;
       case 'page-unload':
       case 'page-hidden':
+      case 'flush-now':
         await this.flushLogs();
         break;
       default:
