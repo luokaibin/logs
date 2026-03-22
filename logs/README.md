@@ -134,7 +134,28 @@ window.addEventListener('error', (e) => {
 **服务端修改默认日志级别 (通过环境变量)**:
 在 Node.js 环境中，您可以通过设置 `LOGS_LEVEL` 环境变量来覆盖模块加载时设置的默认 `TRACE` 级别。支持的级别同 `loglevel` 库（`trace`, `debug`, `info`, `warn`, `error`, `silent`）。
 
-#### 3. 集成 Service Worker
+#### 3. 通过自定义事件触发缓冲区立即上报（`logbeacon:flush`）
+
+在已启用 Service Worker 的 beacon 流程中，除按大小、时间间隔或页面卸载自动上报外，还可通过自定义事件 **`logbeacon:flush`** 要求**立刻**将当前缓冲区中的日志发往服务端（内部会向 Service Worker 投递 `flush-now`，与 `page-unload` / `page-hidden` 触发的上报路径一致）。
+
+适用场景包括：
+
+- App 内嵌 WebView 中 `visibilitychange` 不稳定，需由原生经 JS Bridge 主动触发上报
+- 关键操作完成后希望立即落库，而不等待批量间隔或离开页面
+
+**使用方法**（无需 `detail` 参数）：
+
+```javascript
+// 触发一次立即上报（需已引入 beacon.js 且 SW 已就绪）
+window.dispatchEvent(new CustomEvent('logbeacon:flush'));
+```
+
+**说明**：
+
+- 部署须满足下文 **「集成 Service Worker」** 的要求：页面已加载 `beacon.js`，且已部署同目录下的 `beacon-sw.js`
+- 若当前缓冲区为空，`flush` 不会产生有效网络请求（行为与常规 flush 一致）
+
+#### 4. 集成 Service Worker
 
 要启用 Service Worker 处理日志，需要将相关文件复制到项目的公共目录，并在页面中引入 beacon.js 脚本：
 
@@ -169,7 +190,7 @@ export default function RootLayout({ children }) {
 
 > **注意**: 不需要手动注册 Service Worker，beacon.js 会自动处理注册过程。Service Worker 会自动监听页面状态变化、错误事件和未处理的 Promise 异常。
 
-#### 4. (可选) 配置日志上报地址
+#### 5. (可选) 配置日志上报地址
 
 默认情况下，日志数据会被发送到 `/api/beacon` 接口。您可以通过在引入 `beacon.js` 的 `<script>` 标签上添加 `data-beacon-url` 属性来自定义上报地址。
 
