@@ -86,7 +86,24 @@
 
 ---
 
-## 5. 与现有文档的关系
+## 5. `sendLog` 的异步语义（React Native）
+
+对应 `logs/common/utils.js` 中的 **`sendLog`**：Web 侧通过 `postMessage` / `dispatchEvent` 投递后，主线程**不会等待** Service Worker 完成 IndexedDB 写入或网络上报。
+
+在 RN 中建议**保持同一语义**：
+
+| 建议 | 说明 |
+|------|------|
+| **默认「投递即返回」** | 将 payload **入队**或交给 **`LogAggregator.handleEvent`** 后**立即返回**，**不要**在 `sendLog` 内 **`await`** 完整链路（SQLite 提交、批量落盘、`fetch` 上报等）。 |
+| **`async function` 若保留** | 内部仍**避免** `await` 重 IO；必要时仅保留与 Web 一致的「无 await」路径。 |
+| **调用方** | 业务侧宜 **`void sendLog(...)`** 或**不**将日志失败当作业务关键路径；日志为**热路径**，不应阻塞用户逻辑。 |
+| **例外** | 若合规等场景要求「必须落盘后再继续」，应提供**单独 API**（如 `flushAndWait()` / `persistBarrier()`），**不要**把默认 `sendLog` 改成重 `await`。 |
+
+**结论**：RN 侧 **`sendLog` 与 Web 一致，采用「调用结束、后续异步处理」**；与 [持久化存储方案](./持久化存储方案.md) 中的批量落盘、异步 flush 策略一致。
+
+---
+
+## 6. 与现有文档的关系
 
 - [当前方案存在的问题](./当前方案存在的问题.md) — SW / IndexedDB 等不适配点。  
 - [LogProcessor组合式存储方案](./LogProcessor组合式存储方案.md) — 存储组合与聚合器职责。  
@@ -94,6 +111,7 @@
 
 ---
 
-## 6. 修订记录
+## 7. 修订记录
 
 - 首次编写：记录 **loglevel 在 RN 可用** 及 **RN 侧优先函数调用而非 DOM 事件** 的结论。
+- 补充：**RN 侧 `sendLog` 投递即返回、不 await 全链路** 的语义说明。
