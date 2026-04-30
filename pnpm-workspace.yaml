@@ -1,3 +1,4 @@
 packages:
   - 'logs'
-  - 'example/*'
+  - 'examples/*'
+  - 'packages/*'

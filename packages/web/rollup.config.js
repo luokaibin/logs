@@ -1,0 +1,378 @@
+import { existsSync, readFileSync } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import resolve from '@rollup/plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
+import terser from '@rollup/plugin-terser';
+// import obfuscator from 'rollup-plugin-obfuscator';
+import copyTypes from './rollup-plugin-copy-types.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * 将 `@logbeacon/core/<子路径>` 解析到 `packages/core` 源码（根据 core 的 package.json `exports`）。
+ * 解决如 `@logbeacon/core/LogProcessor.js` 与 exports 中 `./LogProcessor` 不一致导致无法解析、被打成外部 import 的问题。
+ * 必须放在 `@rollup/plugin-node-resolve` 之前。
+ */
+function createResolveLogbeaconCorePlugin() {
+  const corePkgPath = path.resolve(__dirname, '../core/package.json');
+  const coreDir = path.dirname(corePkgPath);
+  /** @type {Record<string, string>} exports 子路径（无 `./`、无 `.js` 后缀）-> 绝对路径 */
+  const subpathToFile = {};
+  try {
+    const pkg = JSON.parse(readFileSync(corePkgPath, 'utf8'));
+    for (const [exportKey, val] of Object.entries(pkg.exports || {})) {
+      if (exportKey === '.') continue;
+      const sub = exportKey.replace(/^\.\//, '');
+      const target =
+        typeof val === 'string' ? val : val.import || val.default;
+      if (typeof target !== 'string') continue;
+      subpathToFile[sub] = path.resolve(coreDir, target);
+    }
+  } catch {
+    // 若读取失败则仅跳过本插件解析
+  }
+
+  return {
+    name: 'resolve-logbeacon-core',
+    resolveId(id) {
+      if (!id.startsWith('@logbeacon/core/')) return null;
+      let sub = id.slice('@logbeacon/core/'.length);
+      if (sub.endsWith('.js')) sub = sub.slice(0, -3);
+      return subpathToFile[sub] ?? null;
+    },
+  };
+}
+
+const resolveLogbeaconCorePlugin = createResolveLogbeaconCorePlugin();
+
+/**
+ * `idb` 仅在 `packages/web` 声明依赖；从 `packages/core` 内文件解析 `idb` 时默认找不到 sibling 包的 node_modules，
+ * Rollup 会把 `import 'idb'` 留成 external。此处强制指向本包 node_modules 内的 ESM 入口以便打进 bundle。
+ */
+function createResolveIdbForBundledDepsPlugin() {
+  const idbEntry = path.resolve(__dirname, 'node_modules/idb/build/index.js');
+  const resolved = existsSync(idbEntry) ? idbEntry : null;
+  return {
+    name: 'resolve-idb-bundled',
+    resolveId(id) {
+      if (id !== 'idb') return null;
+      return resolved;
+    },
+  };
+}
+
+const resolveIdbPlugin = createResolveIdbForBundledDepsPlugin();
+
+/**
+ * terser 插件的配置项
+ * 用于压缩和混淆 JavaScript 代码
+ */
+const terserOptions = {
+  format: {
+    comments: false  // 移除所有注释，减小文件大小
+  },
+  compress: {
+    // drop_console: true,  // 移除所有 console.* 调用
+    drop_debugger: true, // 移除所有 debugger 语句
+    // pure_funcs: ['console.log', 'console.info', 'console.debug']  // 移除特定的纯函数调用
+  },
+  mangle: false  // 混淆变量名，使代码更难读懂并减小文件大小
+};
+
+// 解析模块引用，帮助 Rollup 找到外部模块
+const resolvePlugin = resolve({
+  browser: true, // 优先使用为浏览器环境准备的模块
+  preferBuiltins: false // 不优先使用 Node.js 内置模块
+});
+
+// 将 CommonJS 模块转换为 ES 模块
+const commonjsPlugin = commonjs();
+
+// 压缩代码，使用上面定义的 terserOptions
+// const terserPlugin = terser(terserOptions);
+const terserPlugin = null;
+
+// 混淆器配置选项
+// const obfuscatorOptions = {
+//   global: false, // 不进行全局混淆，只混淆当前文件
+//   options: {
+//     compact: true,               // 压缩代码，移除空白字符和注释
+//     controlFlowFlattening: true, // 控制流扁平化，使代码逻辑更难理解
+//     deadCodeInjection: false,    // 不注入死代码，避免增加文件体积
+//     stringArray: true,           // 将字符串提取到数组中，通过索引引用
+//     stringArrayEncoding: ['rc4'], // 使用 RC4 算法加密字符串数组
+//     stringArrayThreshold: 0.75   // 75% 的字符串会被移到字符串数组中
+//   } 
+// };
+
+// 混淆器插件
+// const obfuscatorPlugin = obfuscator(obfuscatorOptions);
+
+// 输出格式的通用配置
+const outputConfig = {
+  sourcemap: false,  // 生成 sourcemap 文件，便于调试
+  exports: 'auto'   // 自动检测并选择最适合的导出模式（default, named 等）
+};
+
+// Rollup 配置导出
+// 使用已有的 copyTypes 插件复制开发工具文件
+
+export default [
+  {
+    input: 'core/logs.js',
+    output: [
+      {
+        ...outputConfig,
+        file: `dist/core/logs.js`,
+        format: 'esm',
+        sourcemap: true
+      },
+      {
+        ...outputConfig,
+        file: `dist/core/logs.cjs`,
+        format: 'cjs',
+        sourcemap: true
+      },
+    ],
+    plugins: [
+      resolveLogbeaconCorePlugin,
+      resolveIdbPlugin,
+      resolvePlugin,
+      commonjsPlugin,
+      terserPlugin,
+      // 复制类型定义文件到 dist 目录
+      copyTypes({
+        targets: [
+          { src: 'types/logs.d.ts', dest: 'dist/types/logs.d.ts' }
+        ]
+      }),
+    ],
+    // 外部依赖配置，这些依赖不会被打包进最终文件，而是在运行时加载
+    // external: ['loglevel', 'ua-parser-js', 'fflate', 'pbf']
+  },
+  // service worker
+  {
+    // 入口文件路径
+    input: 'sls/beacon-sw.js',
+    output: {
+      file: 'dist/sls/beacon-sw.js',
+      format: 'esm',
+      ...outputConfig
+    },
+    // 使用上面定义的插件数组
+    plugins: [
+      resolveLogbeaconCorePlugin,
+      resolveIdbPlugin,
+      resolvePlugin,
+      commonjsPlugin,
+      terserPlugin,
+      // obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
+    ],
+    // Tree Shaking 优化配置，移除未使用的代码
+    treeshake: {
+      moduleSideEffects: false,         // 假设模块没有副作用，可以安全地移除未使用的导入
+      propertyReadSideEffects: false    // 假设属性读取没有副作用，可以更积极地移除未使用的代码
+    }
+  },
+  // script 标签
+  {
+    // 入口文件路径
+    input: 'sls/beacon.js',
+    output: [
+      {
+        ...outputConfig,
+        file: 'dist/sls/beacon.js',
+        format: 'esm',
+      },
+    ],
+    // 使用上面定义的插件数组
+    plugins: [
+      resolveLogbeaconCorePlugin,
+      resolveIdbPlugin,
+      resolvePlugin,
+      commonjsPlugin,
+      terserPlugin,
+      // obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
+    ],
+    // Tree Shaking 优化配置
+    treeshake: {
+      moduleSideEffects: false,         // 假设模块没有副作用
+      propertyReadSideEffects: false    // 假设属性读取没有副作用
+    }
+  },
+  // 服务端
+  {
+    input: 'sls/slsClient.js',
+    output: [
+      {
+        ...outputConfig,
+        file: `dist/sls/slsClient.js`,
+        format: 'esm',
+        sourcemap: true
+      },
+      {
+        ...outputConfig,
+        file: `dist/sls/slsClient.cjs`,
+        format: 'cjs',
+        sourcemap: true
+      },
+    ],
+    plugins: [
+      resolveLogbeaconCorePlugin,
+      resolveIdbPlugin,
+      resolve({
+        browser: false, // 优先使用为浏览器环境准备的模块
+        preferBuiltins: true // 不优先使用 Node.js 内置模块
+      }),
+      commonjsPlugin,
+      terserPlugin,
+      // 复制 slsClient 类型定义文件到 dist 目录
+      copyTypes({
+        targets: [
+          { src: 'types/slsClient.d.ts', dest: 'dist/types/slsClient.d.ts' }
+        ]
+      }),
+    ],
+    // 外部依赖配置，这些依赖不会被打包进最终文件，而是在运行时加载
+    // external: ['loglevel', 'ua-parser-js', 'fflate', 'pbf']
+  },
+  // service worker
+  {
+    // 入口文件路径
+    input: 'loki/beacon-sw.js',
+    output: {
+      file: 'dist/loki/beacon-sw.js',
+      format: 'esm',
+      ...outputConfig
+    },
+    // 使用上面定义的插件数组
+    plugins: [
+      resolveLogbeaconCorePlugin,
+      resolveIdbPlugin,
+      resolvePlugin,
+      commonjsPlugin,
+      terserPlugin,
+      // obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
+    ],
+    // Tree Shaking 优化配置，移除未使用的代码
+    treeshake: {
+      moduleSideEffects: false,         // 假设模块没有副作用，可以安全地移除未使用的导入
+      propertyReadSideEffects: false    // 假设属性读取没有副作用，可以更积极地移除未使用的代码
+    }
+  },
+  // script 标签
+  {
+    // 入口文件路径
+    input: 'loki/beacon.js',
+    output: [
+      {
+        file: 'dist/loki/beacon.js',
+        format: 'esm',
+        ...outputConfig,
+      },
+    ],
+    // 使用上面定义的插件数组
+    plugins: [
+      resolveLogbeaconCorePlugin,
+      resolveIdbPlugin,
+      resolvePlugin,
+      commonjsPlugin,
+      terserPlugin,
+      // obfuscator(obfuscatorOptions), // 混淆插件，混淆源码部分
+    ],
+    // Tree Shaking 优化配置
+    treeshake: {
+      moduleSideEffects: false,         // 假设模块没有副作用
+      propertyReadSideEffects: false    // 假设属性读取没有副作用
+    }
+  },
+  // 服务端
+  {
+    input: 'loki/lokiClient.js',
+    output: [
+      {
+        ...outputConfig,
+        file: `dist/loki/lokiClient.js`,
+        format: 'esm',
+        sourcemap: true
+      },
+      {
+        ...outputConfig,
+        file: `dist/loki/lokiClient.cjs`,
+        format: 'cjs',
+        sourcemap: true
+      },
+    ],
+    plugins: [
+      resolveLogbeaconCorePlugin,
+      resolveIdbPlugin,
+      resolve({
+        browser: false, // 优先使用为浏览器环境准备的模块
+        preferBuiltins: true // 不优先使用 Node.js 内置模块
+      }),
+      commonjsPlugin,
+      terserPlugin,
+      // 复制 slsClient 类型定义文件到 dist 目录
+      copyTypes({
+        targets: [
+          { src: 'types/lokiClient.d.ts', dest: 'dist/types/lokiClient.d.ts' }
+        ]
+      }),
+    ],
+    // 外部依赖配置，这些依赖不会被打包进最终文件，而是在运行时加载
+    // external: ['loglevel', 'ua-parser-js', 'fflate', 'pbf']
+  },
+  // ESLint插件
+  {
+    input: 'eslint/index.js',
+    output: [
+      {
+        ...outputConfig,
+        file: 'dist/eslint/index.js',
+        format: 'cjs',
+        sourcemap: false
+      },
+      {
+        ...outputConfig,
+        file: 'dist/eslint/index.mjs',
+        format: 'esm',
+        sourcemap: false
+      }
+    ],
+    plugins: [
+      resolve({
+        browser: false,
+        preferBuiltins: true
+      }),
+      commonjsPlugin,
+      // 复制 ESLint 插件的类型定义文件到 dist 目录
+      copyTypes({
+        targets: [
+          { src: 'types/eslintPlugin.d.ts', dest: 'dist/types/eslintPlugin.d.ts' }
+        ]
+      })
+      // 注意：不使用terser和obfuscator，保持ESLint插件代码的可读性
+    ],
+    external: ['eslint']
+  },
+  // 开发辅助工具
+  {
+    // 这个配置只是为了触发 copyTypes 插件
+    input: 'browser/log-filter.js',
+    output: {
+      // 这个文件会被生成，但我们主要关注的是 copyTypes 插件的复制功能
+      file: 'dist/dev-tools/log-filter.js',
+      format: 'esm'
+    },
+    plugins: [
+      // 使用 copyTypes 插件复制 log-filter.js 文件
+      copyTypes({
+        targets: [
+          { src: 'browser/log-filter.js', dest: 'dist/dev-tools/log-filter.js' }
+        ]
+      })
+      // 注意：不使用 terser 和 obfuscator，保持开发工具代码的可读性
+    ]
+  }
+];

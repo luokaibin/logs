@@ -1,0 +1,25 @@
+{
+  "name": "next-log-test",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "sync-beacon": "node ./scripts/sync-beacon.mjs",
+    "predev": "pnpm run sync-beacon",
+    "dev": "next dev -p 3100",
+    "prebuild": "pnpm run sync-beacon",
+    "build": "next build",
+    "start": "next start -p 3100"
+  },
+  "dependencies": {
+    "logbeacon": "workspace:*",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}

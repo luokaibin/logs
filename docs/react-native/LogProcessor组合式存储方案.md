@@ -45,7 +45,7 @@ LogAggregator → LogProcessor（组合 LogStore）
 
 | 层级 | 职责 |
 |------|------|
-| **LogStore** | 仅持久化：日志行（二进制）、digest 表、meta KV；`hydrateState` 等读回能力。 |
+| **LogStore** | 仅持久化：日志行（二进制）、digest 表、meta KV；按需暴露 `getAllLogs` / `getAllMeta` 等读回能力。 |
 | **LogProcessor** | 业务：去重（digest 时间窗）、`completeLog`（UA/IP/region）、`encodeLog` / `decodeLog`、与 `_getMeta` 相关的缓存逻辑；**不**关心具体是 IndexedDB 还是 SQLite。 |
 | **LogAggregator** | 缓冲策略、flush、`logEncoder`、gzip、上报；继续调用 `insertLog` / `getAllLogs` / `getMeta` / `clearLogs` 等 **由 LogProcessor 暴露的稳定 API**（内部再委托 `_store`）。 |
 
@@ -68,7 +68,6 @@ LogAggregator → LogProcessor（组合 LogStore）
 | `setMeta(key, value)` | 元数据写入（键为 `META_KEYS` 等字符串；值为可被编码的类型）。 |
 | `getMeta(key)` | 读取单 key。 |
 | `getAllMeta()` | 读取全部 meta（与 `_getMeta` 冷启动恢复一致）。 |
-| `hydrateState()`（可选但推荐） | 与现网一致：并行恢复 logs、digests、deviceInfo、logContext 等，供 SW 冷启动。 |
 
 ### 3.2 实现类示例名（仅作引用）
 
