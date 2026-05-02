@@ -2,67 +2,60 @@
   "name": "@logbeacon/core",
   "version": "1.7.2",
   "type": "module",
-  "description": "日志编排与公共能力（聚合、去重、SLS/Loki 客户端与编码等）。需由平台层实现持久化（如浏览器侧 IndexedDB）；本包不提供可单独运行的完整存储实现。要求运行环境原生支持 fetch。",
+  "description": "日志编排与公共能力（聚合、去重、持久化抽象等）。SLS/Loki 等平台适配见 @logbeacon/platforms。需由宿主实现持久化；要求运行环境原生支持 fetch。",
   "exports": {
-    "./sls-client": {
-      "import": "./sls/slsClient.js",
-      "default": "./sls/slsClient.js"
-    },
-    "./sls-encoder": {
-      "import": "./sls/logEncoder.js",
-      "default": "./sls/logEncoder.js"
-    },
-    "./loki-client": {
-      "import": "./loki/lokiClient.js",
-      "default": "./loki/lokiClient.js"
-    },
-    "./loki-encoder": {
-      "import": "./loki/logEncoder.js",
-      "default": "./loki/logEncoder.js"
-    },
     "./serializeLogContent": {
-      "import": "./common/serializeLogContent.js",
-      "default": "./common/serializeLogContent.js"
+      "import": "./lib/esm/serializeLogContent.js",
+      "default": "./lib/esm/serializeLogContent.js"
     },
     "./utils": {
-      "import": "./common/utils.js",
-      "default": "./common/utils.js"
+      "import": "./lib/esm/utils.js",
+      "default": "./lib/esm/utils.js"
     },
     "./console-logger": {
-      "import": "./common/ConsoleLogger.js",
-      "default": "./common/ConsoleLogger.js"
+      "import": "./lib/esm/console-logger.js",
+      "default": "./lib/esm/console-logger.js"
     },
     "./constants": {
-      "import": "./common/constants.js",
-      "default": "./common/constants.js"
+      "import": "./lib/esm/constants.js",
+      "default": "./lib/esm/constants.js"
     },
     "./LogProcessor": {
-      "import": "./common/LogProcessor.js",
-      "default": "./common/LogProcessor.js"
+      "import": "./lib/esm/LogProcessor.js",
+      "default": "./lib/esm/LogProcessor.js"
     },
-    "./LogAggregator": {
-      "import": "./common/LogAggregator.js",
-      "default": "./common/LogAggregator.js"
+    "./LogAggregator-sls": {
+      "import": "./lib/esm/LogAggregator-sls.js",
+      "default": "./lib/esm/LogAggregator-sls.js"
+    },
+    "./LogAggregator-loki": {
+      "import": "./lib/esm/LogAggregator-loki.js",
+      "default": "./lib/esm/LogAggregator-loki.js"
     },
     "./LogStore": {
-      "import": "./common/LogStore.js",
-      "default": "./common/LogStore.js"
+      "import": "./lib/esm/LogStore.js",
+      "default": "./lib/esm/LogStore.js"
     },
     "./LogStorageBase": {
-      "import": "./common/LogStorageBase.js",
-      "default": "./common/LogStorageBase.js"
+      "import": "./lib/esm/LogStorageBase.js",
+      "default": "./lib/esm/LogStorageBase.js"
     }
   },
   "files": [
-    "sls",
-    "loki",
-    "common"
+    "lib"
   ],
   "scripts": {
-    "proto:compile": "pbf sls/sls.proto > sls/sls.js"
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "proto:compile": "pnpm --filter @logbeacon/platforms run proto:compile"
   },
   "dependencies": {
     "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@logbeacon/platforms": "workspace:*",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "rollup": "^4.28.1"
   },
   "license": "MIT",
   "repository": {

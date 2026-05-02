@@ -36,7 +36,7 @@ const FNV1A_64_MASK = 0xffffffffffffffffn;
  * @param {string} str
  * @returns {Uint8Array}
  */
-function utf8Bytes(str) {
+function utf8Bytes$1(str) {
   if (typeof TextEncoder !== "undefined") {
     return new TextEncoder().encode(str);
   }
@@ -78,7 +78,7 @@ function utf8Bytes(str) {
  * @returns {string} 固定 16 位十六进制小写字符串
  */
 function dedupContentKey(str) {
-  const bytes = utf8Bytes(str);
+  const bytes = utf8Bytes$1(str);
   let h = FNV1A_64_OFFSET;
   for (let i = 0; i < bytes.length; i++) {
     h ^= BigInt(bytes[i]);
@@ -256,8 +256,6 @@ var shft = function (p) { return ((p + 7) / 8) | 0; };
 // typed array slice - allows garbage collector to free original reference,
 // while being more compatible than .slice
 var slc = function (v, s, e) {
-    if (s == null || s < 0)
-        s = 0;
     if (e == null || e > v.length)
         e = v.length;
     // can't use .constructor in case user-supplied
@@ -816,13 +814,13 @@ class LogStorageBase {
   }
 }
 
-const DB_NAME = 'beacon-db';
-const DB_VERSION = 1;
+const DB_NAME$1 = 'beacon-db';
+const DB_VERSION$1 = 1;
 
 // 定义对象存储区的名称
-const STORE_LOGS = 'b_dat';
-const STORE_DIGEST = 'digestCache';
-const STORE_META = 'meta';
+const STORE_LOGS$1 = 'b_dat';
+const STORE_DIGEST$1 = 'digestCache';
+const STORE_META$1 = 'meta';
 
 /**
  * LogStore — 面向「日志 / digest / meta」的领域 API，通过 {@link LogStorageBase} 的 `ls*` 钩子由平台层实现持久化。
@@ -832,7 +830,7 @@ class LogStore extends LogStorageBase {
 
   constructor() {
     super();
-    this.lsInit(DB_NAME, DB_VERSION, [STORE_LOGS, STORE_DIGEST, STORE_META]);
+    this.lsInit(DB_NAME$1, DB_VERSION$1, [STORE_LOGS$1, STORE_DIGEST$1, STORE_META$1]);
   }
 
   // --- 日志 (b_dat) 操作 ---
@@ -844,7 +842,7 @@ class LogStore extends LogStorageBase {
    */
   async insertLog(logData) {
     // 注意：IndexedDB add/put 的返回值是 key
-    return this.lsAdd(STORE_LOGS, logData);
+    return this.lsAdd(STORE_LOGS$1, logData);
   }
 
   /**
@@ -852,7 +850,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<object[]>} 解析为所有日志记录数组的 Promise。
    */
   async getAllLogs() {
-    return this.lsGetAll(STORE_LOGS);
+    return this.lsGetAll(STORE_LOGS$1);
   }
 
   /**
@@ -860,7 +858,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<number>} 解析为所有日志记录字节数的 Promise。
    */
   async getAllLogsBytes() {
-    return this.lsGetStoreSize(STORE_LOGS);
+    return this.lsGetStoreSize(STORE_LOGS$1);
   }
 
   /**
@@ -868,7 +866,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<void>}
    */
   async clearLogs() {
-    await this.lsClear(STORE_LOGS);
+    await this.lsClear(STORE_LOGS$1);
   }
 
   // --- 摘要 (digestCache) 操作 ---
@@ -880,7 +878,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<string>} 解析为摘要键的 Promise。
    */
   async setDigest(digest, timestamp) {
-    return this.lsPut(STORE_DIGEST, { digest, timestamp });
+    return this.lsPut(STORE_DIGEST$1, { digest, timestamp });
   }
 
   /**
@@ -888,7 +886,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<object[]>} 解析为所有摘要记录数组的 Promise。
    */
   async getAllDigests() {
-    return this.lsGetAll(STORE_DIGEST);
+    return this.lsGetAll(STORE_DIGEST$1);
   }
 
   /**
@@ -897,7 +895,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<void>}
    */
   async clearOldDigests(maxAgeTimestamp) {
-    await this.lsDeleteMany(STORE_DIGEST, { timestamp: { $lte: maxAgeTimestamp } });
+    await this.lsDeleteMany(STORE_DIGEST$1, { timestamp: { $lte: maxAgeTimestamp } });
   }
 
   // --- 元数据 (meta) 操作 ---
@@ -909,7 +907,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<string>} 解析为元数据键的 Promise。
    */
   async setMeta(key, value) {
-    return this.lsPut(STORE_META, value, key);
+    return this.lsPut(STORE_META$1, value, key);
   }
 
   /**
@@ -918,7 +916,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<any | null>} 解析为解码后的元数据值的 Promise，如果不存在则为 null。
    */
   async getMeta(key) {
-    return this.lsGet(STORE_META, key);
+    return this.lsGet(STORE_META$1, key);
   }
 
   /**
@@ -926,7 +924,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<Record<string, string|number>>} 解析为所有元数据记录数组的 Promise。
    */
   async getAllMeta() {
-    return this.lsGetAll(STORE_META);
+    return this.lsGetAll(STORE_META$1);
   }
 }
 
@@ -1263,6 +1261,7 @@ class LogProcessor extends LogStore {
   async insertLog(logItem) {
     if (!logItem.content) return null;
     let log = await this.dedupLog(logItem);
+    console.log('添加日志', log);
     if (!log) return null;
     log = await this.completeLog(log);
     const {size = 0} = await super.insertLog(log);
@@ -1299,6 +1298,926 @@ class LogProcessor extends LogStore {
   }
 }
 
+const SHIFT_LEFT_32$1 = (1 << 16) * (1 << 16);
+const SHIFT_RIGHT_32$1 = 1 / SHIFT_LEFT_32$1;
+
+// Threshold chosen based on both benchmarking and knowledge about browser string
+// data structures (which currently switch structure types at 12 bytes or more)
+const TEXT_DECODER_MIN_LENGTH$1 = 12;
+const utf8TextDecoder$1 = typeof TextDecoder === 'undefined' ? null : new TextDecoder('utf-8');
+
+const PBF_VARINT$1  = 0; // varint: int32, int64, uint32, uint64, sint32, sint64, bool, enum
+const PBF_FIXED64$1 = 1; // 64-bit: double, fixed64, sfixed64
+const PBF_BYTES$1   = 2; // length-delimited: string, bytes, embedded messages, packed repeated fields
+const PBF_FIXED32$1 = 5; // 32-bit: float, fixed32, sfixed32
+
+let Pbf$1 = class Pbf {
+    /**
+     * @param {Uint8Array | ArrayBuffer} [buf]
+     */
+    constructor(buf = new Uint8Array(16)) {
+        this.buf = ArrayBuffer.isView(buf) ? buf : new Uint8Array(buf);
+        this.dataView = new DataView(this.buf.buffer);
+        this.pos = 0;
+        this.type = 0;
+        this.length = this.buf.length;
+    }
+
+    // === READING =================================================================
+
+    /**
+     * @template T
+     * @param {(tag: number, result: T, pbf: Pbf) => void} readField
+     * @param {T} result
+     * @param {number} [end]
+     */
+    readFields(readField, result, end = this.length) {
+        while (this.pos < end) {
+            const val = this.readVarint(),
+                tag = val >> 3,
+                startPos = this.pos;
+
+            this.type = val & 0x7;
+            readField(tag, result, this);
+
+            if (this.pos === startPos) this.skip(val);
+        }
+        return result;
+    }
+
+    /**
+     * @template T
+     * @param {(tag: number, result: T, pbf: Pbf) => void} readField
+     * @param {T} result
+     */
+    readMessage(readField, result) {
+        return this.readFields(readField, result, this.readVarint() + this.pos);
+    }
+
+    readFixed32() {
+        const val = this.dataView.getUint32(this.pos, true);
+        this.pos += 4;
+        return val;
+    }
+
+    readSFixed32() {
+        const val = this.dataView.getInt32(this.pos, true);
+        this.pos += 4;
+        return val;
+    }
+
+    // 64-bit int handling is based on github.com/dpw/node-buffer-more-ints (MIT-licensed)
+
+    readFixed64() {
+        const val = this.dataView.getUint32(this.pos, true) + this.dataView.getUint32(this.pos + 4, true) * SHIFT_LEFT_32$1;
+        this.pos += 8;
+        return val;
+    }
+
+    readSFixed64() {
+        const val = this.dataView.getUint32(this.pos, true) + this.dataView.getInt32(this.pos + 4, true) * SHIFT_LEFT_32$1;
+        this.pos += 8;
+        return val;
+    }
+
+    readFloat() {
+        const val = this.dataView.getFloat32(this.pos, true);
+        this.pos += 4;
+        return val;
+    }
+
+    readDouble() {
+        const val = this.dataView.getFloat64(this.pos, true);
+        this.pos += 8;
+        return val;
+    }
+
+    /**
+     * @param {boolean} [isSigned]
+     */
+    readVarint(isSigned) {
+        const buf = this.buf;
+        let val, b;
+
+        b = buf[this.pos++]; val  =  b & 0x7f;        if (b < 0x80) return val;
+        b = buf[this.pos++]; val |= (b & 0x7f) << 7;  if (b < 0x80) return val;
+        b = buf[this.pos++]; val |= (b & 0x7f) << 14; if (b < 0x80) return val;
+        b = buf[this.pos++]; val |= (b & 0x7f) << 21; if (b < 0x80) return val;
+        b = buf[this.pos];   val |= (b & 0x0f) << 28;
+
+        return readVarintRemainder$1(val, isSigned, this);
+    }
+
+    readVarint64() { // for compatibility with v2.0.1
+        return this.readVarint(true);
+    }
+
+    readSVarint() {
+        const num = this.readVarint();
+        return num % 2 === 1 ? (num + 1) / -2 : num / 2; // zigzag encoding
+    }
+
+    readBoolean() {
+        return Boolean(this.readVarint());
+    }
+
+    readString() {
+        const end = this.readVarint() + this.pos;
+        const pos = this.pos;
+        this.pos = end;
+
+        if (end - pos >= TEXT_DECODER_MIN_LENGTH$1 && utf8TextDecoder$1) {
+            // longer strings are fast with the built-in browser TextDecoder API
+            return utf8TextDecoder$1.decode(this.buf.subarray(pos, end));
+        }
+        // short strings are fast with our custom implementation
+        return readUtf8$1(this.buf, pos, end);
+    }
+
+    readBytes() {
+        const end = this.readVarint() + this.pos,
+            buffer = this.buf.subarray(this.pos, end);
+        this.pos = end;
+        return buffer;
+    }
+
+    // verbose for performance reasons; doesn't affect gzipped size
+
+    /**
+     * @param {number[]} [arr]
+     * @param {boolean} [isSigned]
+     */
+    readPackedVarint(arr = [], isSigned) {
+        const end = this.readPackedEnd();
+        while (this.pos < end) arr.push(this.readVarint(isSigned));
+        return arr;
+    }
+    /** @param {number[]} [arr] */
+    readPackedSVarint(arr = []) {
+        const end = this.readPackedEnd();
+        while (this.pos < end) arr.push(this.readSVarint());
+        return arr;
+    }
+    /** @param {boolean[]} [arr] */
+    readPackedBoolean(arr = []) {
+        const end = this.readPackedEnd();
+        while (this.pos < end) arr.push(this.readBoolean());
+        return arr;
+    }
+    /** @param {number[]} [arr] */
+    readPackedFloat(arr = []) {
+        const end = this.readPackedEnd();
+        while (this.pos < end) arr.push(this.readFloat());
+        return arr;
+    }
+    /** @param {number[]} [arr] */
+    readPackedDouble(arr = []) {
+        const end = this.readPackedEnd();
+        while (this.pos < end) arr.push(this.readDouble());
+        return arr;
+    }
+    /** @param {number[]} [arr] */
+    readPackedFixed32(arr = []) {
+        const end = this.readPackedEnd();
+        while (this.pos < end) arr.push(this.readFixed32());
+        return arr;
+    }
+    /** @param {number[]} [arr] */
+    readPackedSFixed32(arr = []) {
+        const end = this.readPackedEnd();
+        while (this.pos < end) arr.push(this.readSFixed32());
+        return arr;
+    }
+    /** @param {number[]} [arr] */
+    readPackedFixed64(arr = []) {
+        const end = this.readPackedEnd();
+        while (this.pos < end) arr.push(this.readFixed64());
+        return arr;
+    }
+    /** @param {number[]} [arr] */
+    readPackedSFixed64(arr = []) {
+        const end = this.readPackedEnd();
+        while (this.pos < end) arr.push(this.readSFixed64());
+        return arr;
+    }
+    readPackedEnd() {
+        return this.type === PBF_BYTES$1 ? this.readVarint() + this.pos : this.pos + 1;
+    }
+
+    /** @param {number} val */
+    skip(val) {
+        const type = val & 0x7;
+        if (type === PBF_VARINT$1) while (this.buf[this.pos++] > 0x7f) {}
+        else if (type === PBF_BYTES$1) this.pos = this.readVarint() + this.pos;
+        else if (type === PBF_FIXED32$1) this.pos += 4;
+        else if (type === PBF_FIXED64$1) this.pos += 8;
+        else throw new Error(`Unimplemented type: ${type}`);
+    }
+
+    // === WRITING =================================================================
+
+    /**
+     * @param {number} tag
+     * @param {number} type
+     */
+    writeTag(tag, type) {
+        this.writeVarint((tag << 3) | type);
+    }
+
+    /** @param {number} min */
+    realloc(min) {
+        let length = this.length || 16;
+
+        while (length < this.pos + min) length *= 2;
+
+        if (length !== this.length) {
+            const buf = new Uint8Array(length);
+            buf.set(this.buf);
+            this.buf = buf;
+            this.dataView = new DataView(buf.buffer);
+            this.length = length;
+        }
+    }
+
+    finish() {
+        this.length = this.pos;
+        this.pos = 0;
+        return this.buf.subarray(0, this.length);
+    }
+
+    /** @param {number} val */
+    writeFixed32(val) {
+        this.realloc(4);
+        this.dataView.setInt32(this.pos, val, true);
+        this.pos += 4;
+    }
+
+    /** @param {number} val */
+    writeSFixed32(val) {
+        this.realloc(4);
+        this.dataView.setInt32(this.pos, val, true);
+        this.pos += 4;
+    }
+
+    /** @param {number} val */
+    writeFixed64(val) {
+        this.realloc(8);
+        this.dataView.setInt32(this.pos, val & -1, true);
+        this.dataView.setInt32(this.pos + 4, Math.floor(val * SHIFT_RIGHT_32$1), true);
+        this.pos += 8;
+    }
+
+    /** @param {number} val */
+    writeSFixed64(val) {
+        this.realloc(8);
+        this.dataView.setInt32(this.pos, val & -1, true);
+        this.dataView.setInt32(this.pos + 4, Math.floor(val * SHIFT_RIGHT_32$1), true);
+        this.pos += 8;
+    }
+
+    /** @param {number} val */
+    writeVarint(val) {
+        val = +val || 0;
+
+        if (val > 0xfffffff || val < 0) {
+            writeBigVarint$1(val, this);
+            return;
+        }
+
+        this.realloc(4);
+
+        this.buf[this.pos++] =           val & 0x7f  | (val > 0x7f ? 0x80 : 0); if (val <= 0x7f) return;
+        this.buf[this.pos++] = ((val >>>= 7) & 0x7f) | (val > 0x7f ? 0x80 : 0); if (val <= 0x7f) return;
+        this.buf[this.pos++] = ((val >>>= 7) & 0x7f) | (val > 0x7f ? 0x80 : 0); if (val <= 0x7f) return;
+        this.buf[this.pos++] =   (val >>> 7) & 0x7f;
+    }
+
+    /** @param {number} val */
+    writeSVarint(val) {
+        this.writeVarint(val < 0 ? -val * 2 - 1 : val * 2);
+    }
+
+    /** @param {boolean} val */
+    writeBoolean(val) {
+        this.writeVarint(+val);
+    }
+
+    /** @param {string} str */
+    writeString(str) {
+        str = String(str);
+        this.realloc(str.length * 4);
+
+        this.pos++; // reserve 1 byte for short string length
+
+        const startPos = this.pos;
+        // write the string directly to the buffer and see how much was written
+        this.pos = writeUtf8$1(this.buf, str, this.pos);
+        const len = this.pos - startPos;
+
+        if (len >= 0x80) makeRoomForExtraLength$1(startPos, len, this);
+
+        // finally, write the message length in the reserved place and restore the position
+        this.pos = startPos - 1;
+        this.writeVarint(len);
+        this.pos += len;
+    }
+
+    /** @param {number} val */
+    writeFloat(val) {
+        this.realloc(4);
+        this.dataView.setFloat32(this.pos, val, true);
+        this.pos += 4;
+    }
+
+    /** @param {number} val */
+    writeDouble(val) {
+        this.realloc(8);
+        this.dataView.setFloat64(this.pos, val, true);
+        this.pos += 8;
+    }
+
+    /** @param {Uint8Array} buffer */
+    writeBytes(buffer) {
+        const len = buffer.length;
+        this.writeVarint(len);
+        this.realloc(len);
+        for (let i = 0; i < len; i++) this.buf[this.pos++] = buffer[i];
+    }
+
+    /**
+     * @template T
+     * @param {(obj: T, pbf: Pbf) => void} fn
+     * @param {T} obj
+     */
+    writeRawMessage(fn, obj) {
+        this.pos++; // reserve 1 byte for short message length
+
+        // write the message directly to the buffer and see how much was written
+        const startPos = this.pos;
+        fn(obj, this);
+        const len = this.pos - startPos;
+
+        if (len >= 0x80) makeRoomForExtraLength$1(startPos, len, this);
+
+        // finally, write the message length in the reserved place and restore the position
+        this.pos = startPos - 1;
+        this.writeVarint(len);
+        this.pos += len;
+    }
+
+    /**
+     * @template T
+     * @param {number} tag
+     * @param {(obj: T, pbf: Pbf) => void} fn
+     * @param {T} obj
+     */
+    writeMessage(tag, fn, obj) {
+        this.writeTag(tag, PBF_BYTES$1);
+        this.writeRawMessage(fn, obj);
+    }
+
+    /**
+     * @param {number} tag
+     * @param {number[]} arr
+     */
+    writePackedVarint(tag, arr) {
+        if (arr.length) this.writeMessage(tag, writePackedVarint$1, arr);
+    }
+    /**
+     * @param {number} tag
+     * @param {number[]} arr
+     */
+    writePackedSVarint(tag, arr) {
+        if (arr.length) this.writeMessage(tag, writePackedSVarint$1, arr);
+    }
+    /**
+     * @param {number} tag
+     * @param {boolean[]} arr
+     */
+    writePackedBoolean(tag, arr) {
+        if (arr.length) this.writeMessage(tag, writePackedBoolean$1, arr);
+    }
+    /**
+     * @param {number} tag
+     * @param {number[]} arr
+     */
+    writePackedFloat(tag, arr) {
+        if (arr.length) this.writeMessage(tag, writePackedFloat$1, arr);
+    }
+    /**
+     * @param {number} tag
+     * @param {number[]} arr
+     */
+    writePackedDouble(tag, arr) {
+        if (arr.length) this.writeMessage(tag, writePackedDouble$1, arr);
+    }
+    /**
+     * @param {number} tag
+     * @param {number[]} arr
+     */
+    writePackedFixed32(tag, arr) {
+        if (arr.length) this.writeMessage(tag, writePackedFixed32$1, arr);
+    }
+    /**
+     * @param {number} tag
+     * @param {number[]} arr
+     */
+    writePackedSFixed32(tag, arr) {
+        if (arr.length) this.writeMessage(tag, writePackedSFixed32$1, arr);
+    }
+    /**
+     * @param {number} tag
+     * @param {number[]} arr
+     */
+    writePackedFixed64(tag, arr) {
+        if (arr.length) this.writeMessage(tag, writePackedFixed64$1, arr);
+    }
+    /**
+     * @param {number} tag
+     * @param {number[]} arr
+     */
+    writePackedSFixed64(tag, arr) {
+        if (arr.length) this.writeMessage(tag, writePackedSFixed64$1, arr);
+    }
+
+    /**
+     * @param {number} tag
+     * @param {Uint8Array} buffer
+     */
+    writeBytesField(tag, buffer) {
+        this.writeTag(tag, PBF_BYTES$1);
+        this.writeBytes(buffer);
+    }
+    /**
+     * @param {number} tag
+     * @param {number} val
+     */
+    writeFixed32Field(tag, val) {
+        this.writeTag(tag, PBF_FIXED32$1);
+        this.writeFixed32(val);
+    }
+    /**
+     * @param {number} tag
+     * @param {number} val
+     */
+    writeSFixed32Field(tag, val) {
+        this.writeTag(tag, PBF_FIXED32$1);
+        this.writeSFixed32(val);
+    }
+    /**
+     * @param {number} tag
+     * @param {number} val
+     */
+    writeFixed64Field(tag, val) {
+        this.writeTag(tag, PBF_FIXED64$1);
+        this.writeFixed64(val);
+    }
+    /**
+     * @param {number} tag
+     * @param {number} val
+     */
+    writeSFixed64Field(tag, val) {
+        this.writeTag(tag, PBF_FIXED64$1);
+        this.writeSFixed64(val);
+    }
+    /**
+     * @param {number} tag
+     * @param {number} val
+     */
+    writeVarintField(tag, val) {
+        this.writeTag(tag, PBF_VARINT$1);
+        this.writeVarint(val);
+    }
+    /**
+     * @param {number} tag
+     * @param {number} val
+     */
+    writeSVarintField(tag, val) {
+        this.writeTag(tag, PBF_VARINT$1);
+        this.writeSVarint(val);
+    }
+    /**
+     * @param {number} tag
+     * @param {string} str
+     */
+    writeStringField(tag, str) {
+        this.writeTag(tag, PBF_BYTES$1);
+        this.writeString(str);
+    }
+    /**
+     * @param {number} tag
+     * @param {number} val
+     */
+    writeFloatField(tag, val) {
+        this.writeTag(tag, PBF_FIXED32$1);
+        this.writeFloat(val);
+    }
+    /**
+     * @param {number} tag
+     * @param {number} val
+     */
+    writeDoubleField(tag, val) {
+        this.writeTag(tag, PBF_FIXED64$1);
+        this.writeDouble(val);
+    }
+    /**
+     * @param {number} tag
+     * @param {boolean} val
+     */
+    writeBooleanField(tag, val) {
+        this.writeVarintField(tag, +val);
+    }
+};
+/**
+ * @param {number} l
+ * @param {boolean | undefined} s
+ * @param {Pbf} p
+ */
+function readVarintRemainder$1(l, s, p) {
+    const buf = p.buf;
+    let h, b;
+
+    b = buf[p.pos++]; h  = (b & 0x70) >> 4;  if (b < 0x80) return toNum$1(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 3;  if (b < 0x80) return toNum$1(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 10; if (b < 0x80) return toNum$1(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 17; if (b < 0x80) return toNum$1(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 24; if (b < 0x80) return toNum$1(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x01) << 31; if (b < 0x80) return toNum$1(l, h, s);
+
+    throw new Error('Expected varint not more than 10 bytes');
+}
+
+/**
+ * @param {number} low
+ * @param {number} high
+ * @param {boolean} [isSigned]
+ */
+function toNum$1(low, high, isSigned) {
+    return isSigned ? high * 0x100000000 + (low >>> 0) : ((high >>> 0) * 0x100000000) + (low >>> 0);
+}
+
+/**
+ * @param {number} val
+ * @param {Pbf} pbf
+ */
+function writeBigVarint$1(val, pbf) {
+    let low, high;
+
+    if (val >= 0) {
+        low  = (val % 0x100000000) | 0;
+        high = (val / 0x100000000) | 0;
+    } else {
+        low  = ~(-val % 0x100000000);
+        high = ~(-val / 0x100000000);
+
+        if (low ^ 0xffffffff) {
+            low = (low + 1) | 0;
+        } else {
+            low = 0;
+            high = (high + 1) | 0;
+        }
+    }
+
+    if (val >= 0x10000000000000000 || val < -18446744073709552e3) {
+        throw new Error('Given varint doesn\'t fit into 10 bytes');
+    }
+
+    pbf.realloc(10);
+
+    writeBigVarintLow$1(low, high, pbf);
+    writeBigVarintHigh$1(high, pbf);
+}
+
+/**
+ * @param {number} high
+ * @param {number} low
+ * @param {Pbf} pbf
+ */
+function writeBigVarintLow$1(low, high, pbf) {
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos]   = low & 0x7f;
+}
+
+/**
+ * @param {number} high
+ * @param {Pbf} pbf
+ */
+function writeBigVarintHigh$1(high, pbf) {
+    const lsb = (high & 0x07) << 4;
+
+    pbf.buf[pbf.pos++] |= lsb         | ((high >>>= 3) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f;
+}
+
+/**
+ * @param {number} startPos
+ * @param {number} len
+ * @param {Pbf} pbf
+ */
+function makeRoomForExtraLength$1(startPos, len, pbf) {
+    const extraLen =
+        len <= 0x3fff ? 1 :
+        len <= 0x1fffff ? 2 :
+        len <= 0xfffffff ? 3 : Math.floor(Math.log(len) / (Math.LN2 * 7));
+
+    // if 1 byte isn't enough for encoding message length, shift the data to the right
+    pbf.realloc(extraLen);
+    for (let i = pbf.pos - 1; i >= startPos; i--) pbf.buf[i + extraLen] = pbf.buf[i];
+}
+
+/**
+ * @param {number[]} arr
+ * @param {Pbf} pbf
+ */
+function writePackedVarint$1(arr, pbf) {
+    for (let i = 0; i < arr.length; i++) pbf.writeVarint(arr[i]);
+}
+/**
+ * @param {number[]} arr
+ * @param {Pbf} pbf
+ */
+function writePackedSVarint$1(arr, pbf) {
+    for (let i = 0; i < arr.length; i++) pbf.writeSVarint(arr[i]);
+}
+/**
+ * @param {number[]} arr
+ * @param {Pbf} pbf
+ */
+function writePackedFloat$1(arr, pbf) {
+    for (let i = 0; i < arr.length; i++) pbf.writeFloat(arr[i]);
+}
+/**
+ * @param {number[]} arr
+ * @param {Pbf} pbf
+ */
+function writePackedDouble$1(arr, pbf) {
+    for (let i = 0; i < arr.length; i++) pbf.writeDouble(arr[i]);
+}
+/**
+ * @param {boolean[]} arr
+ * @param {Pbf} pbf
+ */
+function writePackedBoolean$1(arr, pbf) {
+    for (let i = 0; i < arr.length; i++) pbf.writeBoolean(arr[i]);
+}
+/**
+ * @param {number[]} arr
+ * @param {Pbf} pbf
+ */
+function writePackedFixed32$1(arr, pbf) {
+    for (let i = 0; i < arr.length; i++) pbf.writeFixed32(arr[i]);
+}
+/**
+ * @param {number[]} arr
+ * @param {Pbf} pbf
+ */
+function writePackedSFixed32$1(arr, pbf) {
+    for (let i = 0; i < arr.length; i++) pbf.writeSFixed32(arr[i]);
+}
+/**
+ * @param {number[]} arr
+ * @param {Pbf} pbf
+ */
+function writePackedFixed64$1(arr, pbf) {
+    for (let i = 0; i < arr.length; i++) pbf.writeFixed64(arr[i]);
+}
+/**
+ * @param {number[]} arr
+ * @param {Pbf} pbf
+ */
+function writePackedSFixed64$1(arr, pbf) {
+    for (let i = 0; i < arr.length; i++) pbf.writeSFixed64(arr[i]);
+}
+
+// Buffer code below from https://github.com/feross/buffer, MIT-licensed
+
+/**
+ * @param {Uint8Array} buf
+ * @param {number} pos
+ * @param {number} end
+ */
+function readUtf8$1(buf, pos, end) {
+    let str = '';
+    let i = pos;
+
+    while (i < end) {
+        const b0 = buf[i];
+        let c = null; // codepoint
+        let bytesPerSequence =
+            b0 > 0xEF ? 4 :
+            b0 > 0xDF ? 3 :
+            b0 > 0xBF ? 2 : 1;
+
+        if (i + bytesPerSequence > end) break;
+
+        let b1, b2, b3;
+
+        if (bytesPerSequence === 1) {
+            if (b0 < 0x80) {
+                c = b0;
+            }
+        } else if (bytesPerSequence === 2) {
+            b1 = buf[i + 1];
+            if ((b1 & 0xC0) === 0x80) {
+                c = (b0 & 0x1F) << 0x6 | (b1 & 0x3F);
+                if (c <= 0x7F) {
+                    c = null;
+                }
+            }
+        } else if (bytesPerSequence === 3) {
+            b1 = buf[i + 1];
+            b2 = buf[i + 2];
+            if ((b1 & 0xC0) === 0x80 && (b2 & 0xC0) === 0x80) {
+                c = (b0 & 0xF) << 0xC | (b1 & 0x3F) << 0x6 | (b2 & 0x3F);
+                if (c <= 0x7FF || (c >= 0xD800 && c <= 0xDFFF)) {
+                    c = null;
+                }
+            }
+        } else if (bytesPerSequence === 4) {
+            b1 = buf[i + 1];
+            b2 = buf[i + 2];
+            b3 = buf[i + 3];
+            if ((b1 & 0xC0) === 0x80 && (b2 & 0xC0) === 0x80 && (b3 & 0xC0) === 0x80) {
+                c = (b0 & 0xF) << 0x12 | (b1 & 0x3F) << 0xC | (b2 & 0x3F) << 0x6 | (b3 & 0x3F);
+                if (c <= 0xFFFF || c >= 0x110000) {
+                    c = null;
+                }
+            }
+        }
+
+        if (c === null) {
+            c = 0xFFFD;
+            bytesPerSequence = 1;
+
+        } else if (c > 0xFFFF) {
+            c -= 0x10000;
+            str += String.fromCharCode(c >>> 10 & 0x3FF | 0xD800);
+            c = 0xDC00 | c & 0x3FF;
+        }
+
+        str += String.fromCharCode(c);
+        i += bytesPerSequence;
+    }
+
+    return str;
+}
+
+/**
+ * @param {Uint8Array} buf
+ * @param {string} str
+ * @param {number} pos
+ */
+function writeUtf8$1(buf, str, pos) {
+    for (let i = 0, c, lead; i < str.length; i++) {
+        c = str.charCodeAt(i); // code point
+
+        if (c > 0xD7FF && c < 0xE000) {
+            if (lead) {
+                if (c < 0xDC00) {
+                    buf[pos++] = 0xEF;
+                    buf[pos++] = 0xBF;
+                    buf[pos++] = 0xBD;
+                    lead = c;
+                    continue;
+                } else {
+                    c = lead - 0xD800 << 10 | c - 0xDC00 | 0x10000;
+                    lead = null;
+                }
+            } else {
+                if (c > 0xDBFF || (i + 1 === str.length)) {
+                    buf[pos++] = 0xEF;
+                    buf[pos++] = 0xBF;
+                    buf[pos++] = 0xBD;
+                } else {
+                    lead = c;
+                }
+                continue;
+            }
+        } else if (lead) {
+            buf[pos++] = 0xEF;
+            buf[pos++] = 0xBF;
+            buf[pos++] = 0xBD;
+            lead = null;
+        }
+
+        if (c < 0x80) {
+            buf[pos++] = c;
+        } else {
+            if (c < 0x800) {
+                buf[pos++] = c >> 0x6 | 0xC0;
+            } else {
+                if (c < 0x10000) {
+                    buf[pos++] = c >> 0xC | 0xE0;
+                } else {
+                    buf[pos++] = c >> 0x12 | 0xF0;
+                    buf[pos++] = c >> 0xC & 0x3F | 0x80;
+                }
+                buf[pos++] = c >> 0x6 & 0x3F | 0x80;
+            }
+            buf[pos++] = c & 0x3F | 0x80;
+        }
+    }
+    return pos;
+}
+
+// code generated by pbf v4.0.1
+
+function writeLog(obj, pbf) {
+    if (obj.Time) pbf.writeVarintField(1, obj.Time);
+    if (obj.Contents) for (const item of obj.Contents) pbf.writeMessage(2, writeLogContent, item);
+    if (obj.TimeNs) pbf.writeFixed32Field(4, obj.TimeNs);
+}
+function writeLogContent(obj, pbf) {
+    if (obj.Key) pbf.writeStringField(1, obj.Key);
+    if (obj.Value) pbf.writeStringField(2, obj.Value);
+}
+function writeLogTag(obj, pbf) {
+    if (obj.Key) pbf.writeStringField(1, obj.Key);
+    if (obj.Value) pbf.writeStringField(2, obj.Value);
+}
+function writeLogGroup(obj, pbf) {
+    if (obj.Logs) for (const item of obj.Logs) pbf.writeMessage(1, writeLog, item);
+    if (obj.Reserved) pbf.writeStringField(2, obj.Reserved);
+    if (obj.Topic) pbf.writeStringField(3, obj.Topic);
+    if (obj.Source) pbf.writeStringField(4, obj.Source);
+    if (obj.LogTags) for (const item of obj.LogTags) pbf.writeMessage(6, writeLogTag, item);
+}
+
+/**
+ * 将日志数组序列化为 protobuf 格式
+ * @param {Array} logs - 日志数组
+ * @param {string} ctxId - 日志上下文ID
+ * @returns {Uint8Array|undefined} - 序列化后的二进制数据
+ */
+function logEncoder(logs, ctxId) {
+  if (!Array.isArray(logs)) {
+    throw new Error('logs must be array!')
+  }
+
+  const LogTags = [];
+  
+  if (ctxId) {
+    LogTags.push({
+      Key: "__pack_id__",
+      Value: ctxId
+    });
+  }
+  // 构建日志对象
+  const payload = {
+    Logs: logs.map(log => {
+      const { time, ...rest } = log;
+      
+      // 展开 extendedAttributes 到顶层
+      const flattened = { ...rest };
+      if (rest.extendedAttributes && typeof rest.extendedAttributes === 'object') {
+        Object.assign(flattened, rest.extendedAttributes);
+        delete flattened.extendedAttributes;
+      }
+      if (rest.extendedMeta && typeof rest.extendedMeta === 'object') {
+        Object.assign(flattened, rest.extendedMeta);
+        delete flattened.extendedMeta;
+      }
+
+      // 创建日志内容
+      const logPayload = {
+        Time: Math.floor(time / 1000),
+        Contents: Object.entries(flattened).reduce((acc, [Key, Value]) => {
+          // 卫语句：Key 必须有效，Value 不能是 null 或 undefined
+          if (!Key || Value === null || Value === undefined || Value === '') {
+            return acc;
+          }
+
+          const finalValue = typeof Value === 'string' ? Value : JSON.stringify(Value);
+
+          // 过滤转换后为空或纯空格的字符串
+          if (!finalValue.trim()) {
+            return acc;
+          }
+
+          acc.push({ Key, Value: finalValue });
+          return acc;
+        }, [])
+      };
+      
+      return logPayload;
+    }).filter(item => !!item?.Contents?.length && !!item?.Time),
+    LogTags: LogTags
+  };
+  if (!payload.Logs?.length) return;
+  console.log('格式化完成 payload', payload);
+  // 创建并编码日志组
+  const pbf = new Pbf$1();
+  writeLogGroup(payload, pbf);
+  return pbf.finish();
+}
+
 /**
  * 日志聚合器
  * 负责日志的缓存、处理和发送
@@ -1329,22 +2248,12 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
   /**
    * 创建日志聚合器实例
    * @param {Object} options - 配置选项
-   * @param {(logs: LogItem[]) => Uint8Array} options.logEncoder - 日志编码器
    * @param {number} [options.flushInterval=300000] - 日志自动发送间隔（毫秒），默认5分钟
    * @param {number} [options.flushSize=3145728] - 日志缓冲区大小上限（字节），默认3MB
    * @param {number} [options.dedupInterval=3000] - 重复日志去重时间窗口（毫秒）
    */
   constructor(options = {}) {
     super(options);
-    if (!options.logEncoder) {
-      throw new Error('logEncoder is required!');
-    }
-    /**
-     * 日志编码器
-     * @type {(logs: LogItem[], logContext: string) => Uint8Array}
-     * @private
-     */
-    this._logEncoder = options.logEncoder;
     /**
      * 日志缓冲区，存储待发送的日志对象 null 说明是冷启动
      * @type {LogItem[]|null}
@@ -1476,6 +2385,7 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
   async _loadAndDecodeLogsFromDB() {
     const logsBytes = await this.getAllLogsBytes();
     const logs = await this.getAllLogs();
+    console.log('从DB加载并解码所有日志', logs, logsBytes);
     return {logs, logsBytes};
   }
   /**
@@ -1546,7 +2456,8 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
     const {logs: logBuffer} = await this._loadAndDecodeLogsFromDB();
     if (!logBuffer || logBuffer.length === 0) return;
     const ctxId = await this?._generateLogContext?.();
-    const payload = this._logEncoder(logBuffer, ctxId);
+    console.log('ctxId', ctxId, logBuffer);
+    const payload = logEncoder(logBuffer, ctxId);
     if (!payload) return;
     const body = this._compressLogs(payload);
     const beaconUrl = await this._getBeaconUrl();
@@ -1899,6 +2810,50 @@ replaceTraps((oldTraps) => ({
         return isIteratorProp(target, prop) || oldTraps.has(target, prop);
     },
 }));
+
+/**
+ * Web Storage 形态的内存实现（无 localStorage 等持久化层时使用）。
+ * @returns {{ setItem(key: string, value: string): void, getItem(key: string): string | null }}
+ */
+
+/**
+ * UTF-8 字节序列；优先用全局 `TextEncoder`（浏览器 / 现代 Node / RN），否则纯 JS 回退（如旧 Node 无全局 TextEncoder）。
+ * @param {string} str
+ * @returns {Uint8Array}
+ */
+function utf8Bytes(str) {
+  if (typeof TextEncoder !== "undefined") {
+    return new TextEncoder().encode(str);
+  }
+  const out = [];
+  for (let i = 0; i < str.length; i++) {
+    let c = str.charCodeAt(i);
+    if (c < 0x80) {
+      out.push(c);
+    } else if (c < 0x800) {
+      out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    } else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+      const c2 = str.charCodeAt(i + 1);
+      if (c2 >= 0xdc00 && c2 <= 0xdfff) {
+        const cp = 0x10000 + ((c & 0x3ff) << 10) + (c2 & 0x3ff);
+        i++;
+        out.push(
+          0xf0 | (cp >> 18),
+          0x80 | ((cp >> 12) & 0x3f),
+          0x80 | ((cp >> 6) & 0x3f),
+          0x80 | (cp & 0x3f)
+        );
+      } else {
+        out.push(0xef, 0xbf, 0xbd);
+      }
+    } else if (c >= 0xdc00 && c <= 0xdfff) {
+      out.push(0xef, 0xbf, 0xbd);
+    } else {
+      out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+    }
+  }
+  return new Uint8Array(out);
+}
 
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
@@ -2733,15 +3688,13 @@ function writeUtf8(buf, str, pos) {
 
 
 function readLogItem(pbf, end) {
-    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", userAgent: "", screen: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
+    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
 }
 function readLogItemField(tag, obj, pbf) {
     if (tag === 1) obj.time = pbf.readVarint(true);
     else if (tag === 2) obj.level = pbf.readString();
     else if (tag === 3) obj.content = pbf.readString();
     else if (tag === 4) obj.clientUuid = pbf.readString();
-    else if (tag === 5) obj.userAgent = pbf.readString();
-    else if (tag === 6) obj.screen = pbf.readString();
     else if (tag === 7) obj.window = pbf.readString();
     else if (tag === 8) obj.url = pbf.readString();
     else if (tag === 9) obj.ip = pbf.readString();
@@ -2756,8 +3709,6 @@ function writeLogItem(obj, pbf) {
     if (obj.level) pbf.writeStringField(2, obj.level);
     if (obj.content) pbf.writeStringField(3, obj.content);
     if (obj.clientUuid) pbf.writeStringField(4, obj.clientUuid);
-    if (obj.userAgent) pbf.writeStringField(5, obj.userAgent);
-    if (obj.screen) pbf.writeStringField(6, obj.screen);
     if (obj.window) pbf.writeStringField(7, obj.window);
     if (obj.url) pbf.writeStringField(8, obj.url);
     if (obj.ip) pbf.writeStringField(9, obj.ip);
@@ -2791,6 +3742,28 @@ function writeLogItem_FieldEntry14(obj, pbf) {
     if (obj.key) pbf.writeStringField(1, obj.key);
     if (obj.value) pbf.writeStringField(2, obj.value);
 }
+
+/**
+ * 日志持久化抽象基类：约定与 `idb` 的 `IDBPDatabase` 相近的 CRUD 形态，
+ * 由具体环境子类（如 Web IndexedDB）实现。
+ *
+ * 持久化相关钩子统一使用 **`ls` 前缀**（log storage），降低与中间层、
+ * 业务子类方法名（如 `add` / `get`）冲突、误覆盖的风险。
+ *
+ * 各 `ls*` 方法第一个参数均为对象仓库名（store name），与 `LogStore` 中
+ * `b_dat` / `digestCache` / `meta` 等常量对应；`lsDeleteMany` 按条件批量删除（如按 `timestamp`）；
+ * `lsGetStoreSize` 用游标累加各条 value 的负载字节数（非引擎磁盘占用）。
+ * `lsInit` 仅做参数校验；连接打开、upgrade 与状态字段由**平台层**实现。
+ */
+
+
+const DB_NAME = 'beacon-db';
+const DB_VERSION = 1;
+
+// 定义对象存储区的名称
+const STORE_LOGS = 'b_dat';
+const STORE_DIGEST = 'digestCache';
+const STORE_META = 'meta';
 
 const MixinLogStore = (BaseClass) => {
   /**
@@ -2919,6 +3892,7 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Promise<number>} 解析为新日志记录ID的 Promise。
      */
     async lsAdd(storeName, value) {
+      console.log("indexeddb add", storeName, value);
       const db = await this._getDB();
       if (storeName === STORE_LOGS) {
         value = this.encodeLog(value);
@@ -3047,15 +4021,16 @@ const MixinLogStore = (BaseClass) => {
   }
 };
 
+/** 打包 service worker 时由 Rollup `resolveId` 解析到 `@logbeacon/core/LogAggregator-sls` 或 `LogAggregator-loki`。 */
+
 const LogAggregator = MixinLogStore(LogAggregator$1);
 
 let taskChain = Promise.resolve();
 
-const genHandleMessage = (logEncoder) => {
+function genHandleMessage() {
   const logAggregator = new LogAggregator({
-    logEncoder,
     flushInterval: 5 * 60 * 1000, // 5 minutes
-    flushSize: 3 * 1024 * 1024,   // 3MB
+    flushSize: 3 * 1024 * 1024, // 3MB
   });
 
   const handle = (event) => {
@@ -3074,107 +4049,16 @@ const genHandleMessage = (logEncoder) => {
     } catch (e) {
     }
   };
-};
-
-// code generated by pbf v4.0.1
-
-function writeLog(obj, pbf) {
-    if (obj.Time) pbf.writeVarintField(1, obj.Time);
-    if (obj.Contents) for (const item of obj.Contents) pbf.writeMessage(2, writeLogContent, item);
-    if (obj.TimeNs) pbf.writeFixed32Field(4, obj.TimeNs);
-}
-function writeLogContent(obj, pbf) {
-    if (obj.Key) pbf.writeStringField(1, obj.Key);
-    if (obj.Value) pbf.writeStringField(2, obj.Value);
-}
-function writeLogTag(obj, pbf) {
-    if (obj.Key) pbf.writeStringField(1, obj.Key);
-    if (obj.Value) pbf.writeStringField(2, obj.Value);
-}
-function writeLogGroup(obj, pbf) {
-    if (obj.Logs) for (const item of obj.Logs) pbf.writeMessage(1, writeLog, item);
-    if (obj.Reserved) pbf.writeStringField(2, obj.Reserved);
-    if (obj.Topic) pbf.writeStringField(3, obj.Topic);
-    if (obj.Source) pbf.writeStringField(4, obj.Source);
-    if (obj.LogTags) for (const item of obj.LogTags) pbf.writeMessage(6, writeLogTag, item);
 }
 
-/**
- * 将日志数组序列化为 protobuf 格式
- * @param {Array} logs - 日志数组
- * @param {string} ctxId - 日志上下文ID
- * @returns {Uint8Array|undefined} - 序列化后的二进制数据
- */
-function logEncoder(logs, ctxId) {
-  if (!Array.isArray(logs)) {
-    throw new Error('logs must be array!')
-  }
-
-  const LogTags = [];
-  
-  if (ctxId) {
-    LogTags.push({
-      Key: "__pack_id__",
-      Value: ctxId
-    });
-  }
-  // 构建日志对象
-  const payload = {
-    Logs: logs.map(log => {
-      const { time, ...rest } = log;
-      
-      // 展开 extendedAttributes 到顶层
-      const flattened = { ...rest };
-      if (rest.extendedAttributes && typeof rest.extendedAttributes === 'object') {
-        Object.assign(flattened, rest.extendedAttributes);
-        delete flattened.extendedAttributes;
-      }
-      if (rest.extendedMeta && typeof rest.extendedMeta === 'object') {
-        Object.assign(flattened, rest.extendedMeta);
-        delete flattened.extendedMeta;
-      }
-
-      // 创建日志内容
-      const logPayload = {
-        Time: Math.floor(time / 1000),
-        Contents: Object.entries(flattened).reduce((acc, [Key, Value]) => {
-          // 卫语句：Key 必须有效，Value 不能是 null 或 undefined
-          if (!Key || Value === null || Value === undefined || Value === '') {
-            return acc;
-          }
-
-          const finalValue = typeof Value === 'string' ? Value : JSON.stringify(Value);
-
-          // 过滤转换后为空或纯空格的字符串
-          if (!finalValue.trim()) {
-            return acc;
-          }
-
-          acc.push({ Key, Value: finalValue });
-          return acc;
-        }, [])
-      };
-      
-      return logPayload;
-    }).filter(item => !!item?.Contents?.length && !!item?.Time),
-    LogTags: LogTags
-  };
-  if (!payload.Logs?.length) return;
-
-  // 创建并编码日志组
-  const pbf = new Pbf();
-  writeLogGroup(payload, pbf);
-  return pbf.finish();
-}
-
-const handleMessage = genHandleMessage(logEncoder);
+const handleMessage = genHandleMessage();
 
 self.addEventListener('message', handleMessage);
 
-self.addEventListener('install', event => {
+self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting());
 });
 
-self.addEventListener('activate', event => {
+self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });

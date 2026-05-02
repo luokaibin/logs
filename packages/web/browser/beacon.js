@@ -3,7 +3,7 @@ import { UAParser } from 'ua-parser-js';
 import { serializeLogContent, serializeSingleValue } from '../common/serializeLogContent.js';
 import { LogProcessor } from '../common/LogProcessor.js';
 
-export const generateLog = () => {
+const generateLog = () => {
   const currentScript = document.currentScript;
   function initSWBridge() {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -218,3 +218,6 @@ export const generateLog = () => {
     }
   }
 };
+
+/** 作为 `<script type="module">` 入口加载时立即初始化（与原先 sls/loki/beacon.js 行为一致）。 */
+generateLog();

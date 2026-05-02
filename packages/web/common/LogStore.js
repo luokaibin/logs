@@ -138,6 +138,7 @@ export const MixinLogStore = (BaseClass) => {
      * @returns {Promise<number>} 解析为新日志记录ID的 Promise。
      */
     async lsAdd(storeName, value) {
+      console.log("indexeddb add", storeName, value);
       const db = await this._getDB();
       if (storeName === STORE_LOGS) {
         value = this.encodeLog(value);

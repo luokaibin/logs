@@ -36,7 +36,7 @@ const FNV1A_64_MASK = 0xffffffffffffffffn;
  * @param {string} str
  * @returns {Uint8Array}
  */
-function utf8Bytes(str) {
+function utf8Bytes$1(str) {
   if (typeof TextEncoder !== "undefined") {
     return new TextEncoder().encode(str);
   }
@@ -78,7 +78,7 @@ function utf8Bytes(str) {
  * @returns {string} 固定 16 位十六进制小写字符串
  */
 function dedupContentKey(str) {
-  const bytes = utf8Bytes(str);
+  const bytes = utf8Bytes$1(str);
   let h = FNV1A_64_OFFSET;
   for (let i = 0; i < bytes.length; i++) {
     h ^= BigInt(bytes[i]);
@@ -256,8 +256,6 @@ var shft = function (p) { return ((p + 7) / 8) | 0; };
 // typed array slice - allows garbage collector to free original reference,
 // while being more compatible than .slice
 var slc = function (v, s, e) {
-    if (s == null || s < 0)
-        s = 0;
     if (e == null || e > v.length)
         e = v.length;
     // can't use .constructor in case user-supplied
@@ -816,13 +814,13 @@ class LogStorageBase {
   }
 }
 
-const DB_NAME = 'beacon-db';
-const DB_VERSION = 1;
+const DB_NAME$1 = 'beacon-db';
+const DB_VERSION$1 = 1;
 
 // 定义对象存储区的名称
-const STORE_LOGS = 'b_dat';
-const STORE_DIGEST = 'digestCache';
-const STORE_META = 'meta';
+const STORE_LOGS$1 = 'b_dat';
+const STORE_DIGEST$1 = 'digestCache';
+const STORE_META$1 = 'meta';
 
 /**
  * LogStore — 面向「日志 / digest / meta」的领域 API，通过 {@link LogStorageBase} 的 `ls*` 钩子由平台层实现持久化。
@@ -832,7 +830,7 @@ class LogStore extends LogStorageBase {
 
   constructor() {
     super();
-    this.lsInit(DB_NAME, DB_VERSION, [STORE_LOGS, STORE_DIGEST, STORE_META]);
+    this.lsInit(DB_NAME$1, DB_VERSION$1, [STORE_LOGS$1, STORE_DIGEST$1, STORE_META$1]);
   }
 
   // --- 日志 (b_dat) 操作 ---
@@ -844,7 +842,7 @@ class LogStore extends LogStorageBase {
    */
   async insertLog(logData) {
     // 注意：IndexedDB add/put 的返回值是 key
-    return this.lsAdd(STORE_LOGS, logData);
+    return this.lsAdd(STORE_LOGS$1, logData);
   }
 
   /**
@@ -852,7 +850,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<object[]>} 解析为所有日志记录数组的 Promise。
    */
   async getAllLogs() {
-    return this.lsGetAll(STORE_LOGS);
+    return this.lsGetAll(STORE_LOGS$1);
   }
 
   /**
@@ -860,7 +858,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<number>} 解析为所有日志记录字节数的 Promise。
    */
   async getAllLogsBytes() {
-    return this.lsGetStoreSize(STORE_LOGS);
+    return this.lsGetStoreSize(STORE_LOGS$1);
   }
 
   /**
@@ -868,7 +866,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<void>}
    */
   async clearLogs() {
-    await this.lsClear(STORE_LOGS);
+    await this.lsClear(STORE_LOGS$1);
   }
 
   // --- 摘要 (digestCache) 操作 ---
@@ -880,7 +878,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<string>} 解析为摘要键的 Promise。
    */
   async setDigest(digest, timestamp) {
-    return this.lsPut(STORE_DIGEST, { digest, timestamp });
+    return this.lsPut(STORE_DIGEST$1, { digest, timestamp });
   }
 
   /**
@@ -888,7 +886,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<object[]>} 解析为所有摘要记录数组的 Promise。
    */
   async getAllDigests() {
-    return this.lsGetAll(STORE_DIGEST);
+    return this.lsGetAll(STORE_DIGEST$1);
   }
 
   /**
@@ -897,7 +895,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<void>}
    */
   async clearOldDigests(maxAgeTimestamp) {
-    await this.lsDeleteMany(STORE_DIGEST, { timestamp: { $lte: maxAgeTimestamp } });
+    await this.lsDeleteMany(STORE_DIGEST$1, { timestamp: { $lte: maxAgeTimestamp } });
   }
 
   // --- 元数据 (meta) 操作 ---
@@ -909,7 +907,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<string>} 解析为元数据键的 Promise。
    */
   async setMeta(key, value) {
-    return this.lsPut(STORE_META, value, key);
+    return this.lsPut(STORE_META$1, value, key);
   }
 
   /**
@@ -918,7 +916,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<any | null>} 解析为解码后的元数据值的 Promise，如果不存在则为 null。
    */
   async getMeta(key) {
-    return this.lsGet(STORE_META, key);
+    return this.lsGet(STORE_META$1, key);
   }
 
   /**
@@ -926,7 +924,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<Record<string, string|number>>} 解析为所有元数据记录数组的 Promise。
    */
   async getAllMeta() {
-    return this.lsGetAll(STORE_META);
+    return this.lsGetAll(STORE_META$1);
   }
 }
 
@@ -1263,6 +1261,7 @@ class LogProcessor extends LogStore {
   async insertLog(logItem) {
     if (!logItem.content) return null;
     let log = await this.dedupLog(logItem);
+    console.log('添加日志', log);
     if (!log) return null;
     log = await this.completeLog(log);
     const {size = 0} = await super.insertLog(log);
@@ -1300,6 +1299,48 @@ class LogProcessor extends LogStore {
 }
 
 /**
+ * 将日志数组序列化为 Loki 格式
+ * @param {Array} logs - 日志数组
+ * @param {string} ctxId - 日志上下文ID
+ * @returns {Uint8Array|undefined} - 序列化后的 Loki 格式数据
+ */
+function logEncoder(logs, ctxId) {
+    // 这里每条日志单独作为一条 value，上报到同一个 stream（可根据需要自定义标签）
+    const streamLabels = {
+      host: location.hostname,
+    };
+    
+    const values = logs.map(item => {
+      // Loki 需要纳秒级时间戳字符串
+      const ts = (item.time ? (item.time * 1e6) : (Date.now() * 1e6)).toString();
+      
+      // 展开 extendedAttributes 到顶层
+      const flattened = { ...item };
+      if (item.extendedAttributes && typeof item.extendedAttributes === 'object') {
+        Object.assign(flattened, item.extendedAttributes);
+        delete flattened.extendedAttributes;
+      }
+      if (item.extendedMeta && typeof item.extendedMeta === 'object') {
+        Object.assign(flattened, item.extendedMeta);
+        delete flattened.extendedMeta;
+      }
+
+      // message内容建议为字符串，这里直接序列化展开后的item
+      return [ts, JSON.stringify(flattened)];
+    }).filter(item => item.length === 2 && item[0] && item[1]?.trim()?.length);
+    if (!values?.length) return;
+    const lokiPayload = {
+      streams: [
+        {
+          stream: streamLabels,
+          values: values
+        }
+      ]
+    };
+    return new TextEncoder().encode(JSON.stringify(lokiPayload));
+}
+
+/**
  * 日志聚合器
  * 负责日志的缓存、处理和发送
  */
@@ -1329,22 +1370,12 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
   /**
    * 创建日志聚合器实例
    * @param {Object} options - 配置选项
-   * @param {(logs: LogItem[]) => Uint8Array} options.logEncoder - 日志编码器
    * @param {number} [options.flushInterval=300000] - 日志自动发送间隔（毫秒），默认5分钟
    * @param {number} [options.flushSize=3145728] - 日志缓冲区大小上限（字节），默认3MB
    * @param {number} [options.dedupInterval=3000] - 重复日志去重时间窗口（毫秒）
    */
   constructor(options = {}) {
     super(options);
-    if (!options.logEncoder) {
-      throw new Error('logEncoder is required!');
-    }
-    /**
-     * 日志编码器
-     * @type {(logs: LogItem[], logContext: string) => Uint8Array}
-     * @private
-     */
-    this._logEncoder = options.logEncoder;
     /**
      * 日志缓冲区，存储待发送的日志对象 null 说明是冷启动
      * @type {LogItem[]|null}
@@ -1476,6 +1507,7 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
   async _loadAndDecodeLogsFromDB() {
     const logsBytes = await this.getAllLogsBytes();
     const logs = await this.getAllLogs();
+    console.log('从DB加载并解码所有日志', logs, logsBytes);
     return {logs, logsBytes};
   }
   /**
@@ -1546,7 +1578,8 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
     const {logs: logBuffer} = await this._loadAndDecodeLogsFromDB();
     if (!logBuffer || logBuffer.length === 0) return;
     const ctxId = await this?._generateLogContext?.();
-    const payload = this._logEncoder(logBuffer, ctxId);
+    console.log('ctxId', ctxId, logBuffer);
+    const payload = logEncoder(logBuffer);
     if (!payload) return;
     const body = this._compressLogs(payload);
     const beaconUrl = await this._getBeaconUrl();
@@ -1899,6 +1932,50 @@ replaceTraps((oldTraps) => ({
         return isIteratorProp(target, prop) || oldTraps.has(target, prop);
     },
 }));
+
+/**
+ * Web Storage 形态的内存实现（无 localStorage 等持久化层时使用）。
+ * @returns {{ setItem(key: string, value: string): void, getItem(key: string): string | null }}
+ */
+
+/**
+ * UTF-8 字节序列；优先用全局 `TextEncoder`（浏览器 / 现代 Node / RN），否则纯 JS 回退（如旧 Node 无全局 TextEncoder）。
+ * @param {string} str
+ * @returns {Uint8Array}
+ */
+function utf8Bytes(str) {
+  if (typeof TextEncoder !== "undefined") {
+    return new TextEncoder().encode(str);
+  }
+  const out = [];
+  for (let i = 0; i < str.length; i++) {
+    let c = str.charCodeAt(i);
+    if (c < 0x80) {
+      out.push(c);
+    } else if (c < 0x800) {
+      out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    } else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+      const c2 = str.charCodeAt(i + 1);
+      if (c2 >= 0xdc00 && c2 <= 0xdfff) {
+        const cp = 0x10000 + ((c & 0x3ff) << 10) + (c2 & 0x3ff);
+        i++;
+        out.push(
+          0xf0 | (cp >> 18),
+          0x80 | ((cp >> 12) & 0x3f),
+          0x80 | ((cp >> 6) & 0x3f),
+          0x80 | (cp & 0x3f)
+        );
+      } else {
+        out.push(0xef, 0xbf, 0xbd);
+      }
+    } else if (c >= 0xdc00 && c <= 0xdfff) {
+      out.push(0xef, 0xbf, 0xbd);
+    } else {
+      out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+    }
+  }
+  return new Uint8Array(out);
+}
 
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
@@ -2733,15 +2810,13 @@ function writeUtf8(buf, str, pos) {
 
 
 function readLogItem(pbf, end) {
-    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", userAgent: "", screen: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
+    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
 }
 function readLogItemField(tag, obj, pbf) {
     if (tag === 1) obj.time = pbf.readVarint(true);
     else if (tag === 2) obj.level = pbf.readString();
     else if (tag === 3) obj.content = pbf.readString();
     else if (tag === 4) obj.clientUuid = pbf.readString();
-    else if (tag === 5) obj.userAgent = pbf.readString();
-    else if (tag === 6) obj.screen = pbf.readString();
     else if (tag === 7) obj.window = pbf.readString();
     else if (tag === 8) obj.url = pbf.readString();
     else if (tag === 9) obj.ip = pbf.readString();
@@ -2756,8 +2831,6 @@ function writeLogItem(obj, pbf) {
     if (obj.level) pbf.writeStringField(2, obj.level);
     if (obj.content) pbf.writeStringField(3, obj.content);
     if (obj.clientUuid) pbf.writeStringField(4, obj.clientUuid);
-    if (obj.userAgent) pbf.writeStringField(5, obj.userAgent);
-    if (obj.screen) pbf.writeStringField(6, obj.screen);
     if (obj.window) pbf.writeStringField(7, obj.window);
     if (obj.url) pbf.writeStringField(8, obj.url);
     if (obj.ip) pbf.writeStringField(9, obj.ip);
@@ -2791,6 +2864,28 @@ function writeLogItem_FieldEntry14(obj, pbf) {
     if (obj.key) pbf.writeStringField(1, obj.key);
     if (obj.value) pbf.writeStringField(2, obj.value);
 }
+
+/**
+ * 日志持久化抽象基类：约定与 `idb` 的 `IDBPDatabase` 相近的 CRUD 形态，
+ * 由具体环境子类（如 Web IndexedDB）实现。
+ *
+ * 持久化相关钩子统一使用 **`ls` 前缀**（log storage），降低与中间层、
+ * 业务子类方法名（如 `add` / `get`）冲突、误覆盖的风险。
+ *
+ * 各 `ls*` 方法第一个参数均为对象仓库名（store name），与 `LogStore` 中
+ * `b_dat` / `digestCache` / `meta` 等常量对应；`lsDeleteMany` 按条件批量删除（如按 `timestamp`）；
+ * `lsGetStoreSize` 用游标累加各条 value 的负载字节数（非引擎磁盘占用）。
+ * `lsInit` 仅做参数校验；连接打开、upgrade 与状态字段由**平台层**实现。
+ */
+
+
+const DB_NAME = 'beacon-db';
+const DB_VERSION = 1;
+
+// 定义对象存储区的名称
+const STORE_LOGS = 'b_dat';
+const STORE_DIGEST = 'digestCache';
+const STORE_META = 'meta';
 
 const MixinLogStore = (BaseClass) => {
   /**
@@ -2919,6 +3014,7 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Promise<number>} 解析为新日志记录ID的 Promise。
      */
     async lsAdd(storeName, value) {
+      console.log("indexeddb add", storeName, value);
       const db = await this._getDB();
       if (storeName === STORE_LOGS) {
         value = this.encodeLog(value);
@@ -3047,15 +3143,16 @@ const MixinLogStore = (BaseClass) => {
   }
 };
 
+/** 打包 service worker 时由 Rollup `resolveId` 解析到 `@logbeacon/core/LogAggregator-sls` 或 `LogAggregator-loki`。 */
+
 const LogAggregator = MixinLogStore(LogAggregator$1);
 
 let taskChain = Promise.resolve();
 
-const genHandleMessage = (logEncoder) => {
+function genHandleMessage() {
   const logAggregator = new LogAggregator({
-    logEncoder,
     flushInterval: 5 * 60 * 1000, // 5 minutes
-    flushSize: 3 * 1024 * 1024,   // 3MB
+    flushSize: 3 * 1024 * 1024, // 3MB
   });
 
   const handle = (event) => {
@@ -3074,58 +3171,16 @@ const genHandleMessage = (logEncoder) => {
     } catch (e) {
     }
   };
-};
-
-/**
- * 将日志数组序列化为 Loki 格式
- * @param {Array} logs - 日志数组
- * @param {string} ctxId - 日志上下文ID
- * @returns {Uint8Array|undefined} - 序列化后的 Loki 格式数据
- */
-function logEncoder(logs, ctxId) {
-    // 这里每条日志单独作为一条 value，上报到同一个 stream（可根据需要自定义标签）
-    const streamLabels = {
-      host: location.hostname,
-    };
-    
-    const values = logs.map(item => {
-      // Loki 需要纳秒级时间戳字符串
-      const ts = (item.time ? (item.time * 1e6) : (Date.now() * 1e6)).toString();
-      
-      // 展开 extendedAttributes 到顶层
-      const flattened = { ...item };
-      if (item.extendedAttributes && typeof item.extendedAttributes === 'object') {
-        Object.assign(flattened, item.extendedAttributes);
-        delete flattened.extendedAttributes;
-      }
-      if (item.extendedMeta && typeof item.extendedMeta === 'object') {
-        Object.assign(flattened, item.extendedMeta);
-        delete flattened.extendedMeta;
-      }
-
-      // message内容建议为字符串，这里直接序列化展开后的item
-      return [ts, JSON.stringify(flattened)];
-    }).filter(item => item.length === 2 && item[0] && item[1]?.trim()?.length);
-    if (!values?.length) return;
-    const lokiPayload = {
-      streams: [
-        {
-          stream: streamLabels,
-          values: values
-        }
-      ]
-    };
-    return new TextEncoder().encode(JSON.stringify(lokiPayload));
 }
 
-const handleMessage = genHandleMessage(logEncoder);
+const handleMessage = genHandleMessage();
 
 self.addEventListener('message', handleMessage);
 
-self.addEventListener('install', event => {
+self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting());
 });
 
-self.addEventListener('activate', event => {
+self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });

@@ -1,12 +1,11 @@
-import {LogAggregator} from '../common/LogAggregator.js';
+import { LogAggregator } from '../common/LogAggregator.js';
 
 let taskChain = Promise.resolve();
 
-export const genHandleMessage = (logEncoder) => {
+function genHandleMessage() {
   const logAggregator = new LogAggregator({
-    logEncoder,
     flushInterval: 5 * 60 * 1000, // 5 minutes
-    flushSize: 3 * 1024 * 1024,   // 3MB
+    flushSize: 3 * 1024 * 1024, // 3MB
   });
 
   const handle = (event) => {
@@ -25,4 +24,16 @@ export const genHandleMessage = (logEncoder) => {
     } catch (e) {
     }
   };
-};
+}
+
+const handleMessage = genHandleMessage();
+
+self.addEventListener('message', handleMessage);
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});

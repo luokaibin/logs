@@ -14,18 +14,12 @@ function createMemoryStorage() {
   };
 }
 
-/** FNV-1a 64-bit：offset basis */
-const FNV1A_64_OFFSET = 14695981039346656037n;
-/** FNV-1a 64-bit：prime */
-const FNV1A_64_PRIME = 1099511628211n;
-const FNV1A_64_MASK = 0xffffffffffffffffn;
-
 /**
  * UTF-8 字节序列；优先用全局 `TextEncoder`（浏览器 / 现代 Node / RN），否则纯 JS 回退（如旧 Node 无全局 TextEncoder）。
  * @param {string} str
  * @returns {Uint8Array}
  */
-function utf8Bytes(str) {
+function utf8Bytes$1(str) {
   if (typeof TextEncoder !== "undefined") {
     return new TextEncoder().encode(str);
   }
@@ -57,52 +51,6 @@ function utf8Bytes(str) {
     }
   }
   return new Uint8Array(out);
-}
-
-/**
- * 为日志正文生成去重键（FNV-1a 64-bit，输入按 UTF-8 字节计算）。
- * 同步、轻量，不依赖 crypto.subtle；需运行环境支持 **BigInt**（Node 10+、现代浏览器与 Hermes）。
- * 非密码学强度，仅用于短时间窗内的内容去重。
- * @param {string} str
- * @returns {string} 固定 16 位十六进制小写字符串
- */
-function dedupContentKey(str) {
-  const bytes = utf8Bytes(str);
-  let h = FNV1A_64_OFFSET;
-  for (let i = 0; i < bytes.length; i++) {
-    h ^= BigInt(bytes[i]);
-    h = (h * FNV1A_64_PRIME) & FNV1A_64_MASK;
-  }
-  return h.toString(16).padStart(16, "0");
-}
-
-/**
- * 判断两个时间戳是否为同一天
- * @param {number} ts1 毫秒级时间戳
- * @param {number} ts2 毫秒级时间戳
- * @returns {boolean}
- */
-function isSameDay(ts1, ts2) {
-  const d1 = new Date(Number(ts1));
-  const d2 = new Date(Number(ts2));
-  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
-}
-
-/**
- * 请求公网IP和地区（使用 geojs）
- * @returns {Promise<{ip?: string, region?: string}>}
- */
-async function fetchPublicIPAndRegion() {
-  try {
-    const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
-    if (!res.ok) return {};
-    const data = await res.json();
-    const ip = data.ip;
-    const region = data.country;
-    return { ip, region };
-  } catch (e) {
-    return {};
-  }
 }
 
 /**
@@ -220,7 +168,7 @@ function getLogExtraInfo$1() {
 }
 
 // 默认的数组采样规则
-const ARRAY_SAMPLING_CONFIG = {
+const ARRAY_SAMPLING_CONFIG$1 = {
   primitive: {
     threshold: 20, // 对简单数组保持宽松的阈值
     head: 10,      // 保留足够的上下文
@@ -238,9 +186,6 @@ const ARRAY_SAMPLING_CONFIG = {
 // 序列化后日志字符串的最大长度
 const MAX_LOG_LENGTH = 100000;
 
-/** 无浏览器特化时的空处理器表；直接调用 core 导出时请使用 `.call(defaultTypeHandlers, …)` 或与 web 包一样 `.bind(handlers)` */
-const defaultTypeHandlers = new Map();
-
 /**
  * 递归地将值转换为可 JSON 序列化的格式。
  * @param {any} value - 需要序列化的值。
@@ -251,7 +196,7 @@ const defaultTypeHandlers = new Map();
  * @param {WeakSet} [seen=new WeakSet()] - 用于检测循环引用的集合，用于递归。
  * @returns {any} 可序列化的值。
  */
-function serializeSingleValue$1(
+function serializeSingleValue$2(
   value,
   options = {
     maxDepth: 10,
@@ -319,14 +264,14 @@ function serializeSingleValue$1(
     const obj = {};
     for (const [k, v] of value.entries()) {
       const keyStr = typeof k === 'object' && k !== null ? '[object]' : String(k);
-      obj[keyStr] = serializeSingleValue$1.call(this, v, options, currentDepth + 1, seen);
+      obj[keyStr] = serializeSingleValue$2.call(this, v, options, currentDepth + 1, seen);
     }
     return obj;
   }
   if (typeof Set !== 'undefined' && value instanceof Set) {
     const arr = [];
     for (const v of value.values()) {
-      arr.push(serializeSingleValue$1.call(this, v, options, currentDepth + 1, seen));
+      arr.push(serializeSingleValue$2.call(this, v, options, currentDepth + 1, seen));
     }
     return arr;
   }
@@ -334,11 +279,11 @@ function serializeSingleValue$1(
   // 处理数组 (包括采样逻辑)
   if (Array.isArray(value)) {
     const isComplex = value.length > 0 && typeof value[0] === 'object' && value[0] !== null;
-    const rules = isComplex ? ARRAY_SAMPLING_CONFIG.complex : ARRAY_SAMPLING_CONFIG.primitive;
+    const rules = isComplex ? ARRAY_SAMPLING_CONFIG$1.complex : ARRAY_SAMPLING_CONFIG$1.primitive;
 
     // 卫语句：如果未达到采样阈值，则正常处理并提前返回
     if (value.length <= rules.threshold) {
-      return value.map(item => serializeSingleValue$1.call(this, item, options, currentDepth + 1, seen));
+      return value.map(item => serializeSingleValue$2.call(this, item, options, currentDepth + 1, seen));
     }
 
     // --- 采样逻辑开始 ---
@@ -361,7 +306,7 @@ function serializeSingleValue$1(
 
     const sortedIndices = Array.from(indices).sort((a, b) => a - b);
     for (const index of sortedIndices) {
-      sampledResult._e[index] = serializeSingleValue$1.call(this, value[index], options, currentDepth + 1, seen);
+      sampledResult._e[index] = serializeSingleValue$2.call(this, value[index], options, currentDepth + 1, seen);
     }
 
     return sampledResult;
@@ -371,7 +316,7 @@ function serializeSingleValue$1(
   if (typeof value === 'object' && value !== null) {
      // 检查是否有自定义的 toJSON 方法
     if (typeof value.toJSON === 'function') {
-      return serializeSingleValue$1.call(this, value.toJSON(), options, currentDepth + 1, seen);
+      return serializeSingleValue$2.call(this, value.toJSON(), options, currentDepth + 1, seen);
     }
 
     const result = {};
@@ -379,7 +324,7 @@ function serializeSingleValue$1(
       if (sensitiveKeys.includes(key.toLowerCase())) {
         result[key] = '[敏感信息已过滤]';
       } else {
-        result[key] = serializeSingleValue$1.call(this, value[key], options, currentDepth + 1, seen);
+        result[key] = serializeSingleValue$2.call(this, value[key], options, currentDepth + 1, seen);
       }
     }
     return result;
@@ -395,7 +340,7 @@ function serializeSingleValue$1(
  * @returns {string} 序列化后的 JSON 字符串。
  */
 function serializeLogContent$1(content) {
-  const serializableObject = serializeSingleValue$1.call(this, content);
+  const serializableObject = serializeSingleValue$2.call(this, content);
 
   try {
     const result = JSON.stringify(serializableObject);
@@ -418,19 +363,19 @@ if (typeof window !== 'undefined') {
     filename: value.filename,
     lineno: value.lineno,
     colno: value.colno,
-    error: serializeSingleValue(value.error, options, currentDepth + 1, seen),
+    error: serializeSingleValue$1(value.error, options, currentDepth + 1, seen),
   }));
 
   // PromiseRejectionEvent 处理器
   browserTypeHandlers.set(window.PromiseRejectionEvent, (value, options, currentDepth, seen) => ({
     _t: 'PromiseRejectionEvent',
-    reason: serializeSingleValue(value.reason, options, currentDepth + 1, seen),
+    reason: serializeSingleValue$1(value.reason, options, currentDepth + 1, seen),
   }));
 
   // MessageEvent 处理器
   browserTypeHandlers.set(window.MessageEvent, (value, options, currentDepth, seen) => ({
     _t: 'MessageEvent',
-    data: serializeSingleValue(value.data, options, currentDepth + 1, seen),
+    data: serializeSingleValue$1(value.data, options, currentDepth + 1, seen),
     origin: value.origin,
     lastEventId: value.lastEventId,
     source: '[WindowProxy]', // source 是一个 window proxy, 不能直接序列化
@@ -448,7 +393,7 @@ if (typeof window !== 'undefined') {
   browserTypeHandlers.set(window.CustomEvent, (value, options, currentDepth, seen) => ({
     _t: 'CustomEvent',
     type: value.type,
-    detail: serializeSingleValue(value.detail, options, currentDepth + 1, seen),
+    detail: serializeSingleValue$1(value.detail, options, currentDepth + 1, seen),
     bubbles: value.bubbles,
     cancelable: value.cancelable,
     composed: value.composed,
@@ -499,7 +444,7 @@ if (typeof window !== 'undefined') {
   );
 }
 
-const serializeSingleValue = serializeSingleValue$1.bind(browserTypeHandlers);
+const serializeSingleValue$1 = serializeSingleValue$2.bind(browserTypeHandlers);
 const serializeLogContent = serializeLogContent$1.bind(browserTypeHandlers);
 
 /**
@@ -2084,7 +2029,7 @@ async function getServiceWorker(scope = '/beacon/') {
  * 各 `ls*` 方法第一个参数均为对象仓库名（store name），与 `LogStore` 中
  * `b_dat` / `digestCache` / `meta` 等常量对应；`lsDeleteMany` 按条件批量删除（如按 `timestamp`）；
  * `lsGetStoreSize` 用游标累加各条 value 的负载字节数（非引擎磁盘占用）。
- * `lsInit` 写入 `_dbName` / `_dbVersion` / `_storeNames`，供子类建连与 `upgrade` 使用。
+ * `lsInit` 仅做参数校验；连接打开、upgrade 与状态字段由**平台层**实现。
  */
 
 /** @typedef {string|number|Date|ArrayBuffer|ArrayBufferView|IDBArrayKey} StorageKey */
@@ -2097,8 +2042,7 @@ async function getServiceWorker(scope = '/beacon/') {
 class LogStorageBase {
 
   /**
-   * 绑定库名、版本与对象仓库名列表；子类在打开连接（如 `openDB`）前应调用，
-   * 通常写作 `await super.lsInit(dbName, dbVersion, storeNames)` 再执行异步打开逻辑。
+   * 校验库名、版本与对象仓库名列表（子类若需统一入口可先 `await super.lsInit(...)`，再执行 `openDB` 等）。
    * @param {string} dbName
    * @param {number} dbVersion
    * @param {readonly string[]|string[]} storeNames 参与建库/升级的对象仓库名（非空字符串）
@@ -2190,24 +2134,23 @@ class LogStorageBase {
   }
 }
 
-const DB_NAME = 'beacon-db';
-const DB_VERSION = 1;
+const DB_NAME$1 = 'beacon-db';
+const DB_VERSION$1 = 1;
 
 // 定义对象存储区的名称
-const STORE_LOGS = 'b_dat';
-const STORE_DIGEST = 'digestCache';
-const STORE_META = 'meta';
+const STORE_LOGS$1 = 'b_dat';
+const STORE_DIGEST$1 = 'digestCache';
+const STORE_META$1 = 'meta';
 
 /**
- * LogStore - 一个用于管理 IndexedDB 中日志持久化的基类。
- * 它处理数据库初始化、模式升级，并为日志、摘要和元数据
- * 提供原子化的 CRUD 操作方法。
+ * LogStore — 面向「日志 / digest / meta」的领域 API，通过 {@link LogStorageBase} 的 `ls*` 钩子由平台层实现持久化。
+ * 本类不绑定具体存储引擎；浏览器实现见 `logbeacon` 包中的 `MixinLogStore`。
  */
 class LogStore extends LogStorageBase {
 
   constructor() {
     super();
-    this.lsInit(DB_NAME, DB_VERSION, [STORE_LOGS, STORE_DIGEST, STORE_META]);
+    this.lsInit(DB_NAME$1, DB_VERSION$1, [STORE_LOGS$1, STORE_DIGEST$1, STORE_META$1]);
   }
 
   // --- 日志 (b_dat) 操作 ---
@@ -2219,7 +2162,7 @@ class LogStore extends LogStorageBase {
    */
   async insertLog(logData) {
     // 注意：IndexedDB add/put 的返回值是 key
-    return this.lsAdd(STORE_LOGS, logData);
+    return this.lsAdd(STORE_LOGS$1, logData);
   }
 
   /**
@@ -2227,7 +2170,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<object[]>} 解析为所有日志记录数组的 Promise。
    */
   async getAllLogs() {
-    return this.lsGetAll(STORE_LOGS);
+    return this.lsGetAll(STORE_LOGS$1);
   }
 
   /**
@@ -2235,7 +2178,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<number>} 解析为所有日志记录字节数的 Promise。
    */
   async getAllLogsBytes() {
-    return this.lsGetStoreSize(STORE_LOGS);
+    return this.lsGetStoreSize(STORE_LOGS$1);
   }
 
   /**
@@ -2243,7 +2186,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<void>}
    */
   async clearLogs() {
-    await this.lsClear(STORE_LOGS);
+    await this.lsClear(STORE_LOGS$1);
   }
 
   // --- 摘要 (digestCache) 操作 ---
@@ -2255,7 +2198,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<string>} 解析为摘要键的 Promise。
    */
   async setDigest(digest, timestamp) {
-    return this.lsPut(STORE_DIGEST, { digest, timestamp });
+    return this.lsPut(STORE_DIGEST$1, { digest, timestamp });
   }
 
   /**
@@ -2263,7 +2206,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<object[]>} 解析为所有摘要记录数组的 Promise。
    */
   async getAllDigests() {
-    return this.lsGetAll(STORE_DIGEST);
+    return this.lsGetAll(STORE_DIGEST$1);
   }
 
   /**
@@ -2272,7 +2215,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<void>}
    */
   async clearOldDigests(maxAgeTimestamp) {
-    await this.lsDeleteMany(STORE_DIGEST, { timestamp: { $lte: maxAgeTimestamp } });
+    await this.lsDeleteMany(STORE_DIGEST$1, { timestamp: { $lte: maxAgeTimestamp } });
   }
 
   // --- 元数据 (meta) 操作 ---
@@ -2284,7 +2227,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<string>} 解析为元数据键的 Promise。
    */
   async setMeta(key, value) {
-    return this.lsPut(STORE_META, value, key);
+    return this.lsPut(STORE_META$1, value, key);
   }
 
   /**
@@ -2293,7 +2236,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<any | null>} 解析为解码后的元数据值的 Promise，如果不存在则为 null。
    */
   async getMeta(key) {
-    return this.lsGet(STORE_META, key);
+    return this.lsGet(STORE_META$1, key);
   }
 
   /**
@@ -2301,28 +2244,787 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<Record<string, string|number>>} 解析为所有元数据记录数组的 Promise。
    */
   async getAllMeta() {
-    return this.lsGetAll(STORE_META);
+    return this.lsGetAll(STORE_META$1);
+  }
+}
+
+/**
+ * Web Storage 形态的内存实现（无 localStorage 等持久化层时使用）。
+ * @returns {{ setItem(key: string, value: string): void, getItem(key: string): string | null }}
+ */
+
+/** FNV-1a 64-bit：offset basis */
+const FNV1A_64_OFFSET = 14695981039346656037n;
+/** FNV-1a 64-bit：prime */
+const FNV1A_64_PRIME = 1099511628211n;
+const FNV1A_64_MASK = 0xffffffffffffffffn;
+
+/**
+ * UTF-8 字节序列；优先用全局 `TextEncoder`（浏览器 / 现代 Node / RN），否则纯 JS 回退（如旧 Node 无全局 TextEncoder）。
+ * @param {string} str
+ * @returns {Uint8Array}
+ */
+function utf8Bytes(str) {
+  if (typeof TextEncoder !== "undefined") {
+    return new TextEncoder().encode(str);
+  }
+  const out = [];
+  for (let i = 0; i < str.length; i++) {
+    let c = str.charCodeAt(i);
+    if (c < 0x80) {
+      out.push(c);
+    } else if (c < 0x800) {
+      out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    } else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+      const c2 = str.charCodeAt(i + 1);
+      if (c2 >= 0xdc00 && c2 <= 0xdfff) {
+        const cp = 0x10000 + ((c & 0x3ff) << 10) + (c2 & 0x3ff);
+        i++;
+        out.push(
+          0xf0 | (cp >> 18),
+          0x80 | ((cp >> 12) & 0x3f),
+          0x80 | ((cp >> 6) & 0x3f),
+          0x80 | (cp & 0x3f)
+        );
+      } else {
+        out.push(0xef, 0xbf, 0xbd);
+      }
+    } else if (c >= 0xdc00 && c <= 0xdfff) {
+      out.push(0xef, 0xbf, 0xbd);
+    } else {
+      out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+    }
+  }
+  return new Uint8Array(out);
+}
+
+/**
+ * 为日志正文生成去重键（FNV-1a 64-bit，输入按 UTF-8 字节计算）。
+ * 同步、轻量，不依赖 crypto.subtle；需运行环境支持 **BigInt**（Node 10+、现代浏览器与 Hermes）。
+ * 非密码学强度，仅用于短时间窗内的内容去重。
+ * @param {string} str
+ * @returns {string} 固定 16 位十六进制小写字符串
+ */
+function dedupContentKey(str) {
+  const bytes = utf8Bytes(str);
+  let h = FNV1A_64_OFFSET;
+  for (let i = 0; i < bytes.length; i++) {
+    h ^= BigInt(bytes[i]);
+    h = (h * FNV1A_64_PRIME) & FNV1A_64_MASK;
+  }
+  return h.toString(16).padStart(16, "0");
+}
+
+/**
+ * 判断两个时间戳是否为同一天
+ * @param {number} ts1 毫秒级时间戳
+ * @param {number} ts2 毫秒级时间戳
+ * @returns {boolean}
+ */
+function isSameDay(ts1, ts2) {
+  const d1 = new Date(Number(ts1));
+  const d2 = new Date(Number(ts2));
+  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+}
+
+/**
+ * 请求公网IP和地区（使用 geojs）
+ * @returns {Promise<{ip?: string, region?: string}>}
+ */
+async function fetchPublicIPAndRegion() {
+  try {
+    const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
+    if (!res.ok) return {};
+    const data = await res.json();
+    const ip = data.ip;
+    const region = data.country;
+    return { ip, region };
+  } catch (e) {
+    return {};
+  }
+}
+
+// 默认的数组采样规则
+const ARRAY_SAMPLING_CONFIG = {
+  primitive: {
+    threshold: 20, // 对简单数组保持宽松的阈值
+    head: 10,      // 保留足够的上下文
+    tail: 4,
+    middle: 3
+  },
+  complex: {
+    threshold: 10, // 对复杂数组使用严格的阈值
+    head: 5,       // 采用更保守的采样数
+    tail: 3,
+    middle: 2
+  },
+};
+
+/** 无浏览器特化时的空处理器表；直接调用 core 导出时请使用 `.call(defaultTypeHandlers, …)` 或与 web 包一样 `.bind(handlers)` */
+const defaultTypeHandlers = new Map();
+
+/**
+ * 递归地将值转换为可 JSON 序列化的格式。
+ * @param {any} value - 需要序列化的值。
+ * @param {object} [options={maxDepth: 10, sensitiveKeys: [...]}] - 序列化选项。
+ * @param {number} [options.maxDepth=10] - 最大序列化深度。
+ * @param {string[]} [options.sensitiveKeys=['password', 'token', 'secret', 'auth']] - 敏感信息的键名。
+ * @param {number} [currentDepth=0] - 当前序列化深度，用于递归。
+ * @param {WeakSet} [seen=new WeakSet()] - 用于检测循环引用的集合，用于递归。
+ * @returns {any} 可序列化的值。
+ */
+function serializeSingleValue(
+  value,
+  options = {
+    maxDepth: 10,
+    sensitiveKeys: ['password', 'token', 'secret', 'auth'],
+  },
+  currentDepth = 0,
+  seen = new WeakSet(),
+) {
+  const { maxDepth, sensitiveKeys } = options;
+  const type = typeof value;
+
+  // 处理原始类型和 null
+  if (value === null || ['string', 'number', 'boolean', 'undefined'].includes(type)) {
+    return value;
+  }
+
+  // 处理 BigInt
+  if (type === 'bigint') {
+    return `${value.toString()}n`;
+  }
+
+  // 处理 Symbol
+  if (type === 'symbol') {
+    return value.toString();
+  }
+  
+  // 处理函数
+  if (type === 'function') {
+    return `[Function: ${value.name || 'anonymous'}]`;
+  }
+
+  // --- 对象类型处理开始 ---
+
+  // 检查循环引用
+  if (typeof value === 'object') {
+    if (seen.has(value)) {
+      return '[循环引用]';
+    }
+    seen.add(value);
+  }
+
+  // 检查最大深度
+  if (currentDepth >= maxDepth) {
+    return `[达到最大深度: ${Object.prototype.toString.call(value)}]`;
+  }
+
+  // 处理特殊对象类型
+  // 检查是否有专门的类型处理器（策略模式）
+  for (const [typeConstructor, handler] of this.entries()) {
+    if (value instanceof typeConstructor) {
+      return handler(value, options, currentDepth, seen);
+    }
+  }
+
+  if (value instanceof Error) {
+    return `${value.name}: ${value.message}\nStack: ${value.stack || ''}`;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (value instanceof RegExp) {
+    return value.toString();
+  }
+  if (typeof Map !== 'undefined' && value instanceof Map) {
+    const obj = {};
+    for (const [k, v] of value.entries()) {
+      const keyStr = typeof k === 'object' && k !== null ? '[object]' : String(k);
+      obj[keyStr] = serializeSingleValue.call(this, v, options, currentDepth + 1, seen);
+    }
+    return obj;
+  }
+  if (typeof Set !== 'undefined' && value instanceof Set) {
+    const arr = [];
+    for (const v of value.values()) {
+      arr.push(serializeSingleValue.call(this, v, options, currentDepth + 1, seen));
+    }
+    return arr;
+  }
+
+  // 处理数组 (包括采样逻辑)
+  if (Array.isArray(value)) {
+    const isComplex = value.length > 0 && typeof value[0] === 'object' && value[0] !== null;
+    const rules = isComplex ? ARRAY_SAMPLING_CONFIG.complex : ARRAY_SAMPLING_CONFIG.primitive;
+
+    // 卫语句：如果未达到采样阈值，则正常处理并提前返回
+    if (value.length <= rules.threshold) {
+      return value.map(item => serializeSingleValue.call(this, item, options, currentDepth + 1, seen));
+    }
+
+    // --- 采样逻辑开始 ---
+    const sampledResult = { _t: 'arr', _l: value.length, _e: {} };
+    const indices = new Set();
+
+    // Head
+    for (let i = 0; i < rules.head && i < value.length; i++) {
+      indices.add(i);
+    }
+    // Tail
+    for (let i = 0; i < rules.tail && value.length - 1 - i >= 0; i++) {
+      indices.add(value.length - 1 - i);
+    }
+    // Middle
+    const midStart = Math.floor(value.length / 2 - rules.middle / 2);
+    for (let i = 0; i < rules.middle && midStart + i < value.length; i++) {
+      indices.add(midStart + i);
+    }
+
+    const sortedIndices = Array.from(indices).sort((a, b) => a - b);
+    for (const index of sortedIndices) {
+      sampledResult._e[index] = serializeSingleValue.call(this, value[index], options, currentDepth + 1, seen);
+    }
+
+    return sampledResult;
+  }
+
+  // 处理普通对象
+  if (typeof value === 'object' && value !== null) {
+     // 检查是否有自定义的 toJSON 方法
+    if (typeof value.toJSON === 'function') {
+      return serializeSingleValue.call(this, value.toJSON(), options, currentDepth + 1, seen);
+    }
+
+    const result = {};
+    for (const key of Object.keys(value)) {
+      if (sensitiveKeys.includes(key.toLowerCase())) {
+        result[key] = '[敏感信息已过滤]';
+      } else {
+        result[key] = serializeSingleValue.call(this, value[key], options, currentDepth + 1, seen);
+      }
+    }
+    return result;
+  }
+
+  // 兜底处理
+  return String(value);
+}
+
+/**
+ * @file 常量定义文件
+ */
+
+/**
+ * 预先计算好的元数据键的 SHA-256 哈希值，用于在 IndexedDB 中作为键名，以增强隐私性。
+ * @const {Object<string, string>}
+ */
+const META_KEYS = {
+  IP: 'bb9af5d1915da1fbc132ced081325efcd2e63e4804f96890f42e9739677237a4',
+  REGION: 'c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6',
+  LAST_UPDATE_TIME: '0682cd61a299947aa5324230d6d64eb1eef0a9b612cbdd2c7ca25355fb614201',
+  LOG_CONTEXT: '5d9a7a8550f5914b8895af9c0dae801a3da0a102e411c2c505efe37f06a011fa',
+  BEACON_URL: '24950352bd3207a680735e5075d9c1256b9c13d1116235b31305dfb256c5470a', // for 'beaconUrl'
+};
+
+/**
+ * 可作为元数据键持久化的 META_KEYS 哈希值白名单（与 {@link META_KEYS} 的 value 一一对应）。
+ * @type {readonly string[]}
+ */
+const META_KEYS_WHITELIST = Object.freeze(Object.values(META_KEYS));
+
+/**
+ * 日志处理器类
+ * 负责单条日志的处理和存储，包括去重、元数据补充等
+ */
+let LogProcessor$1 = class LogProcessor extends LogStore {
+  /**
+   * 创建日志处理器实例
+   * @param {Object} options - 配置选项
+   * @param {number} [options.dedupInterval=2000] - 重复日志去重时间窗口（毫秒）
+   */
+  constructor(options = {}) {
+    super(options);
+    /**
+     * 日志摘要缓存，用于去重 null 说明是冷启动
+     * @type {Map<string, number>|null}
+     * @private
+     */
+    this._logDigestCache = null;
+
+    /**
+     * 重复日志去重时间窗口（毫秒）
+     * @type {number}
+     * @private
+     */
+    this._dedupInterval = options.dedupInterval || 3000;
+
+    /**
+     * 当前公网出口IP
+     * @type {string|null}
+     * @private
+     */
+    this._currentIp = null;
+    
+    /**
+     * 当前公网出口IP所在地区
+     * @type {string|null}
+     * @private
+     */
+    this._currentRegion = null;
+
+    /**
+     * 上次更新元数据的时间戳（毫秒）
+     * @type {number}
+     * @private
+     */
+    this._lastUpdateTime = 0;
+
+    /**
+     * 非标准 / 额外元数据的内存镜像（键不在 {@link META_KEYS_WHITELIST} 内时由 {@link LogProcessor#applyExtendedMetaIfChanged} 写入）。
+     * @type {Object.<string, string>}
+     */
+    this.extendedMeta = Object.create(null);
   }
 
   /**
-   * 从 IndexedDB 中恢复所有状态，用于 Service Worker 冷启动。
-   * @returns {Promise<{logs: object[], digests: object[], deviceInfo: object|null, logContext: object|null}>} 一个包含所有已恢复状态的对象。
+   * 获取摘要时间戳
+   * @private
+   * @returns {Promise<Map<string, number>>} - 摘要时间戳
    */
-  async hydrateState() {
-    const [logs, digests, deviceInfo, logContext] = await Promise.all([
-      this.getAllLogs(),
-      this.getAllDigests(),
-      this.getMeta('deviceInfo'),
-      this.getMeta('logContext'),
-    ]);
-    console.log("[log store][getAllLogs] hydrateState logs", logs);
-    console.log("[log store][getAllDigests] hydrateState digests", digests);
-    console.log("[log store][getMeta] hydrateState deviceInfo", deviceInfo);
-    console.log("[log store][getMeta] hydrateState logContext", logContext);
-
-    return { logs, digests, deviceInfo, logContext };
+  async _getLogDigestCache() {
+    if (this._logDigestCache) return this._logDigestCache;
+    this._logDigestCache = await this.getAllDigests();
+    if (!this._logDigestCache || this._logDigestCache.length === 0) {
+      this._logDigestCache = new Map();
+      return this._logDigestCache;
+    }
+    this._logDigestCache = new Map(this._logDigestCache.map(item => [item.digest, item.timestamp]));
+    return this._logDigestCache;
   }
+
+  /**
+   * 添加摘要到缓存
+   * @private
+   * @param {string} digest - 日志摘要
+   * @param {number} timestamp - 摘要时间戳
+   * @returns {Promise<void>}
+   */
+  async _addLogDigestCache(digest, timestamp) {
+    this._logDigestCache.set(digest, timestamp);
+    await this.setDigest(digest, timestamp);
+  }
+
+  /**
+   * 清空摘要缓存
+   * @private
+   * @returns {Promise<void>}
+   */
+  async _clearLogDigestCache() {
+    this._logDigestCache.clear();
+    await this.clearOldDigests(Date.now());
+  }
+
+  /**
+   * 获取元数据，包括 IP、地理位置与内存中的扩展元数据镜像。
+   * 该方法会优先从内存缓存中读取，如果缓存不存在或已过期（非同一天），则会重新获取并更新缓存和 IndexedDB。
+   * @private
+   * @returns {Promise<{ip: string, region: string, lastUpdateTime: number, extendedMeta: Object.<string, string>}>}
+   */
+  async _getMeta() {
+    if (this._currentIp && this._currentRegion) {
+      return {
+        ip: this._currentIp,
+        region: this._currentRegion,
+        lastUpdateTime: this._lastUpdateTime,
+        extendedMeta: this.extendedMeta,
+      };
+    }
+    const meta = await this.getAllMeta();
+    this._lastUpdateTime = meta[META_KEYS.LAST_UPDATE_TIME];
+    const now = Date.now();
+    this.extendedMeta = Object.fromEntries(Object.entries(meta).filter(([key]) => !META_KEYS_WHITELIST.includes(key)));
+    if (this._lastUpdateTime && isSameDay(this._lastUpdateTime, now)) {
+      this._currentIp = meta[META_KEYS.IP];
+      this._currentRegion = meta[META_KEYS.REGION];
+      return {
+        ip: this._currentIp,
+        region: this._currentRegion,
+        lastUpdateTime: this._lastUpdateTime,
+        extendedMeta: this.extendedMeta,
+      };
+    }
+
+    const { ip, region } = await fetchPublicIPAndRegion();
+    this._currentIp = ip;
+    this._currentRegion = region;
+    this._lastUpdateTime = now;
+
+    await this.setMeta(META_KEYS.LAST_UPDATE_TIME, now);
+    await this.setMeta(META_KEYS.IP, this._currentIp);
+    await this.setMeta(META_KEYS.REGION, this._currentRegion);
+
+    return {
+      ip: this._currentIp,
+      region: this._currentRegion,
+      lastUpdateTime: this._lastUpdateTime,
+      extendedMeta: this.extendedMeta,
+    };
+  }
+
+  /**
+   * 处理非标准或额外元数据：校验字符串后，白名单外键写入 {@link LogProcessor#extendedMeta}，再与 IndexedDB 比对并按需持久化。
+   * @param {string} key - 元数据键
+   * @param {string} value - 元数据值
+   * @returns {Promise<void>}
+   */
+  async applyExtendedMetaIfChanged(key, value) {
+    if (typeof key !== 'string' || typeof value !== 'string') {
+      return;
+    }
+    if (!META_KEYS_WHITELIST.includes(key)) {
+      this.extendedMeta[key] = value;
+    }
+    const stored = await this.getMeta(key);
+    if (value !== stored) {
+      await this.setMeta(key, value);
+    }
+  }
+
+  /**
+   * 添加日志到存储
+   * @param {LogItem} logItem - 日志项
+   * @returns {Promise<{log: LogItem, size: number}|null>} - 返回是否成功添加
+   */
+  async insertLog(logItem) {
+    if (!logItem.content) return null;
+    let log = await this.dedupLog(logItem);
+    console.log('添加日志', log);
+    if (!log) return null;
+    log = await this.completeLog(log);
+    const {size = 0} = await super.insertLog(log);
+    return {log, size};
+  }
+  /**
+   * 日志去重
+   * @param {LogItem} logItem - 日志项
+   * @returns {Promise<LogItem|null>} - 去重后的日志项，如果去重成功则返回 null
+   */
+  async dedupLog(logItem) {
+    const digest = dedupContentKey(logItem.content);
+    const digestCache = await this._getLogDigestCache();
+    const lastTime = digestCache.get(digest);
+    if (lastTime) {
+      // 时间窗口内重复，丢弃
+      if (logItem.time - lastTime <= this._dedupInterval) return null;
+    }
+    // 更新摘要时间或添加新摘要
+    await this._addLogDigestCache(digest, logItem.time);
+    return logItem;
+  }
+  /**
+   * 日志补全元信息
+   * @param {LogItem} logItem - 日志项
+   * @returns {Promise<LogItem>}
+   */
+  async completeLog(logItem) {
+    const { ip, region, extendedMeta } = await this._getMeta();
+    logItem.ip = ip;
+    logItem.region = region;
+    logItem.extendedMeta = serializeSingleValue.call(defaultTypeHandlers, extendedMeta);
+    return logItem;
+  }
+};
+
+const instanceOfAny = (object, constructors) => constructors.some((c) => object instanceof c);
+
+let idbProxyableTypes;
+let cursorAdvanceMethods;
+// This is a function to prevent it throwing up in node environments.
+function getIdbProxyableTypes() {
+    return (idbProxyableTypes ||
+        (idbProxyableTypes = [
+            IDBDatabase,
+            IDBObjectStore,
+            IDBIndex,
+            IDBCursor,
+            IDBTransaction,
+        ]));
 }
+// This is a function to prevent it throwing up in node environments.
+function getCursorAdvanceMethods() {
+    return (cursorAdvanceMethods ||
+        (cursorAdvanceMethods = [
+            IDBCursor.prototype.advance,
+            IDBCursor.prototype.continue,
+            IDBCursor.prototype.continuePrimaryKey,
+        ]));
+}
+const transactionDoneMap = new WeakMap();
+const transformCache = new WeakMap();
+const reverseTransformCache = new WeakMap();
+function promisifyRequest(request) {
+    const promise = new Promise((resolve, reject) => {
+        const unlisten = () => {
+            request.removeEventListener('success', success);
+            request.removeEventListener('error', error);
+        };
+        const success = () => {
+            resolve(wrap(request.result));
+            unlisten();
+        };
+        const error = () => {
+            reject(request.error);
+            unlisten();
+        };
+        request.addEventListener('success', success);
+        request.addEventListener('error', error);
+    });
+    // This mapping exists in reverseTransformCache but doesn't exist in transformCache. This
+    // is because we create many promises from a single IDBRequest.
+    reverseTransformCache.set(promise, request);
+    return promise;
+}
+function cacheDonePromiseForTransaction(tx) {
+    // Early bail if we've already created a done promise for this transaction.
+    if (transactionDoneMap.has(tx))
+        return;
+    const done = new Promise((resolve, reject) => {
+        const unlisten = () => {
+            tx.removeEventListener('complete', complete);
+            tx.removeEventListener('error', error);
+            tx.removeEventListener('abort', error);
+        };
+        const complete = () => {
+            resolve();
+            unlisten();
+        };
+        const error = () => {
+            reject(tx.error || new DOMException('AbortError', 'AbortError'));
+            unlisten();
+        };
+        tx.addEventListener('complete', complete);
+        tx.addEventListener('error', error);
+        tx.addEventListener('abort', error);
+    });
+    // Cache it for later retrieval.
+    transactionDoneMap.set(tx, done);
+}
+let idbProxyTraps = {
+    get(target, prop, receiver) {
+        if (target instanceof IDBTransaction) {
+            // Special handling for transaction.done.
+            if (prop === 'done')
+                return transactionDoneMap.get(target);
+            // Make tx.store return the only store in the transaction, or undefined if there are many.
+            if (prop === 'store') {
+                return receiver.objectStoreNames[1]
+                    ? undefined
+                    : receiver.objectStore(receiver.objectStoreNames[0]);
+            }
+        }
+        // Else transform whatever we get back.
+        return wrap(target[prop]);
+    },
+    set(target, prop, value) {
+        target[prop] = value;
+        return true;
+    },
+    has(target, prop) {
+        if (target instanceof IDBTransaction &&
+            (prop === 'done' || prop === 'store')) {
+            return true;
+        }
+        return prop in target;
+    },
+};
+function replaceTraps(callback) {
+    idbProxyTraps = callback(idbProxyTraps);
+}
+function wrapFunction(func) {
+    // Due to expected object equality (which is enforced by the caching in `wrap`), we
+    // only create one new func per func.
+    // Cursor methods are special, as the behaviour is a little more different to standard IDB. In
+    // IDB, you advance the cursor and wait for a new 'success' on the IDBRequest that gave you the
+    // cursor. It's kinda like a promise that can resolve with many values. That doesn't make sense
+    // with real promises, so each advance methods returns a new promise for the cursor object, or
+    // undefined if the end of the cursor has been reached.
+    if (getCursorAdvanceMethods().includes(func)) {
+        return function (...args) {
+            // Calling the original function with the proxy as 'this' causes ILLEGAL INVOCATION, so we use
+            // the original object.
+            func.apply(unwrap(this), args);
+            return wrap(this.request);
+        };
+    }
+    return function (...args) {
+        // Calling the original function with the proxy as 'this' causes ILLEGAL INVOCATION, so we use
+        // the original object.
+        return wrap(func.apply(unwrap(this), args));
+    };
+}
+function transformCachableValue(value) {
+    if (typeof value === 'function')
+        return wrapFunction(value);
+    // This doesn't return, it just creates a 'done' promise for the transaction,
+    // which is later returned for transaction.done (see idbObjectHandler).
+    if (value instanceof IDBTransaction)
+        cacheDonePromiseForTransaction(value);
+    if (instanceOfAny(value, getIdbProxyableTypes()))
+        return new Proxy(value, idbProxyTraps);
+    // Return the same value back if we're not going to transform it.
+    return value;
+}
+function wrap(value) {
+    // We sometimes generate multiple promises from a single IDBRequest (eg when cursoring), because
+    // IDB is weird and a single IDBRequest can yield many responses, so these can't be cached.
+    if (value instanceof IDBRequest)
+        return promisifyRequest(value);
+    // If we've already transformed this value before, reuse the transformed value.
+    // This is faster, but it also provides object equality.
+    if (transformCache.has(value))
+        return transformCache.get(value);
+    const newValue = transformCachableValue(value);
+    // Not all types are transformed.
+    // These may be primitive types, so they can't be WeakMap keys.
+    if (newValue !== value) {
+        transformCache.set(value, newValue);
+        reverseTransformCache.set(newValue, value);
+    }
+    return newValue;
+}
+const unwrap = (value) => reverseTransformCache.get(value);
+
+/**
+ * Open a database.
+ *
+ * @param name Name of the database.
+ * @param version Schema version.
+ * @param callbacks Additional callbacks.
+ */
+function openDB(name, version, { blocked, upgrade, blocking, terminated } = {}) {
+    const request = indexedDB.open(name, version);
+    const openPromise = wrap(request);
+    if (upgrade) {
+        request.addEventListener('upgradeneeded', (event) => {
+            upgrade(wrap(request.result), event.oldVersion, event.newVersion, wrap(request.transaction), event);
+        });
+    }
+    if (blocked) {
+        request.addEventListener('blocked', (event) => blocked(
+        // Casting due to https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/1405
+        event.oldVersion, event.newVersion, event));
+    }
+    openPromise
+        .then((db) => {
+        if (terminated)
+            db.addEventListener('close', () => terminated());
+        if (blocking) {
+            db.addEventListener('versionchange', (event) => blocking(event.oldVersion, event.newVersion, event));
+        }
+    })
+        .catch(() => { });
+    return openPromise;
+}
+
+const readMethods = ['get', 'getKey', 'getAll', 'getAllKeys', 'count'];
+const writeMethods = ['put', 'add', 'delete', 'clear'];
+const cachedMethods = new Map();
+function getMethod(target, prop) {
+    if (!(target instanceof IDBDatabase &&
+        !(prop in target) &&
+        typeof prop === 'string')) {
+        return;
+    }
+    if (cachedMethods.get(prop))
+        return cachedMethods.get(prop);
+    const targetFuncName = prop.replace(/FromIndex$/, '');
+    const useIndex = prop !== targetFuncName;
+    const isWrite = writeMethods.includes(targetFuncName);
+    if (
+    // Bail if the target doesn't exist on the target. Eg, getAll isn't in Edge.
+    !(targetFuncName in (useIndex ? IDBIndex : IDBObjectStore).prototype) ||
+        !(isWrite || readMethods.includes(targetFuncName))) {
+        return;
+    }
+    const method = async function (storeName, ...args) {
+        // isWrite ? 'readwrite' : undefined gzipps better, but fails in Edge :(
+        const tx = this.transaction(storeName, isWrite ? 'readwrite' : 'readonly');
+        let target = tx.store;
+        if (useIndex)
+            target = target.index(args.shift());
+        // Must reject if op rejects.
+        // If it's a write operation, must reject if tx.done rejects.
+        // Must reject with op rejection first.
+        // Must resolve with op value.
+        // Must handle both promises (no unhandled rejections)
+        return (await Promise.all([
+            target[targetFuncName](...args),
+            isWrite && tx.done,
+        ]))[0];
+    };
+    cachedMethods.set(prop, method);
+    return method;
+}
+replaceTraps((oldTraps) => ({
+    ...oldTraps,
+    get: (target, prop, receiver) => getMethod(target, prop) || oldTraps.get(target, prop, receiver),
+    has: (target, prop) => !!getMethod(target, prop) || oldTraps.has(target, prop),
+}));
+
+const advanceMethodProps = ['continue', 'continuePrimaryKey', 'advance'];
+const methodMap = {};
+const advanceResults = new WeakMap();
+const ittrProxiedCursorToOriginalProxy = new WeakMap();
+const cursorIteratorTraps = {
+    get(target, prop) {
+        if (!advanceMethodProps.includes(prop))
+            return target[prop];
+        let cachedFunc = methodMap[prop];
+        if (!cachedFunc) {
+            cachedFunc = methodMap[prop] = function (...args) {
+                advanceResults.set(this, ittrProxiedCursorToOriginalProxy.get(this)[prop](...args));
+            };
+        }
+        return cachedFunc;
+    },
+};
+async function* iterate(...args) {
+    // tslint:disable-next-line:no-this-assignment
+    let cursor = this;
+    if (!(cursor instanceof IDBCursor)) {
+        cursor = await cursor.openCursor(...args);
+    }
+    if (!cursor)
+        return;
+    cursor = cursor;
+    const proxiedCursor = new Proxy(cursor, cursorIteratorTraps);
+    ittrProxiedCursorToOriginalProxy.set(proxiedCursor, cursor);
+    // Map this double-proxy back to the original, so other cursor methods work.
+    reverseTransformCache.set(proxiedCursor, unwrap(cursor));
+    while (cursor) {
+        yield proxiedCursor;
+        // If one of the advancing methods was not called, call continue().
+        cursor = await (advanceResults.get(proxiedCursor) || cursor.continue());
+        advanceResults.delete(proxiedCursor);
+    }
+}
+function isIteratorProp(target, prop) {
+    return ((prop === Symbol.asyncIterator &&
+        instanceOfAny(target, [IDBIndex, IDBObjectStore, IDBCursor])) ||
+        (prop === 'iterate' && instanceOfAny(target, [IDBIndex, IDBObjectStore])));
+}
+replaceTraps((oldTraps) => ({
+    ...oldTraps,
+    get(target, prop, receiver) {
+        if (isIteratorProp(target, prop))
+            return iterate;
+        return oldTraps.get(target, prop, receiver);
+    },
+    has(target, prop) {
+        return isIteratorProp(target, prop) || oldTraps.has(target, prop);
+    },
+}));
 
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
@@ -3153,542 +3855,17 @@ function writeUtf8(buf, str, pos) {
     return pos;
 }
 
-/**
- * @file 常量定义文件
- */
-
-/**
- * 预先计算好的元数据键的 SHA-256 哈希值，用于在 IndexedDB 中作为键名，以增强隐私性。
- * @const {Object<string, string>}
- */
-const META_KEYS = {
-  IP: 'bb9af5d1915da1fbc132ced081325efcd2e63e4804f96890f42e9739677237a4',
-  REGION: 'c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6',
-  LAST_UPDATE_TIME: '0682cd61a299947aa5324230d6d64eb1eef0a9b612cbdd2c7ca25355fb614201',
-  LOG_CONTEXT: '5d9a7a8550f5914b8895af9c0dae801a3da0a102e411c2c505efe37f06a011fa',
-  BEACON_URL: '24950352bd3207a680735e5075d9c1256b9c13d1116235b31305dfb256c5470a', // for 'beaconUrl'
-};
-
-/**
- * 可作为元数据键持久化的 META_KEYS 哈希值白名单（与 {@link META_KEYS} 的 value 一一对应）。
- * @type {readonly string[]}
- */
-const META_KEYS_WHITELIST = Object.freeze(Object.values(META_KEYS));
-
-/**
- * 日志处理器类
- * 负责单条日志的处理和存储，包括去重、元数据补充等
- */
-let LogProcessor$1 = class LogProcessor extends LogStore {
-  /**
-   * 创建日志处理器实例
-   * @param {Object} options - 配置选项
-   * @param {number} [options.dedupInterval=2000] - 重复日志去重时间窗口（毫秒）
-   */
-  constructor(options = {}) {
-    super(options);
-    /**
-     * 日志摘要缓存，用于去重 null 说明是冷启动
-     * @type {Map<string, number>|null}
-     * @private
-     */
-    this._logDigestCache = null;
-
-    /**
-     * 重复日志去重时间窗口（毫秒）
-     * @type {number}
-     * @private
-     */
-    this._dedupInterval = options.dedupInterval || 3000;
-
-    /**
-     * 当前公网出口IP
-     * @type {string|null}
-     * @private
-     */
-    this._currentIp = null;
-    
-    /**
-     * 当前公网出口IP所在地区
-     * @type {string|null}
-     * @private
-     */
-    this._currentRegion = null;
-
-    /**
-     * 上次更新元数据的时间戳（毫秒）
-     * @type {number}
-     * @private
-     */
-    this._lastUpdateTime = 0;
-
-    /**
-     * 非标准 / 额外元数据的内存镜像（键不在 {@link META_KEYS_WHITELIST} 内时由 {@link LogProcessor#applyExtendedMetaIfChanged} 写入）。
-     * @type {Object.<string, string>}
-     */
-    this.extendedMeta = Object.create(null);
-  }
-
-  /**
-   * 获取摘要时间戳
-   * @private
-   * @returns {Promise<Map<string, number>>} - 摘要时间戳
-   */
-  async _getLogDigestCache() {
-    if (this._logDigestCache) return this._logDigestCache;
-    this._logDigestCache = await this.getAllDigests();
-    console.log("[log processor][getAllDigests] _getLogDigestCache", this._logDigestCache);
-    if (!this._logDigestCache || this._logDigestCache.length === 0) {
-      this._logDigestCache = new Map();
-      return this._logDigestCache;
-    }
-    this._logDigestCache = new Map(this._logDigestCache.map(item => [item.digest, item.timestamp]));
-    return this._logDigestCache;
-  }
-
-  /**
-   * 添加摘要到缓存
-   * @private
-   * @param {string} digest - 日志摘要
-   * @param {number} timestamp - 摘要时间戳
-   * @returns {Promise<void>}
-   */
-  async _addLogDigestCache(digest, timestamp) {
-    this._logDigestCache.set(digest, timestamp);
-    await this.setDigest(digest, timestamp);
-    console.log("[log processor][setDigest] _addLogDigestCache", {digest, timestamp});
-  }
-
-  /**
-   * 清空摘要缓存
-   * @private
-   * @returns {Promise<void>}
-   */
-  async _clearLogDigestCache() {
-    this._logDigestCache.clear();
-    await this.clearOldDigests(Date.now());
-    console.log("[log processor][clearOldDigests] _clearLogDigestCache", Date.now());
-  }
-
-  /**
-   * 获取元数据，包括 IP、地理位置与内存中的扩展元数据镜像。
-   * 该方法会优先从内存缓存中读取，如果缓存不存在或已过期（非同一天），则会重新获取并更新缓存和 IndexedDB。
-   * @private
-   * @returns {Promise<{ip: string, region: string, lastUpdateTime: number, extendedMeta: Object.<string, string>}>}
-   */
-  async _getMeta() {
-    if (this._currentIp && this._currentRegion) {
-      return {
-        ip: this._currentIp,
-        region: this._currentRegion,
-        lastUpdateTime: this._lastUpdateTime,
-        extendedMeta: this.extendedMeta,
-      };
-    }
-    const meta = await this.getAllMeta();
-    console.log("[log processor][getAllMeta] _getMeta", {meta});
-    this._lastUpdateTime = meta[META_KEYS.LAST_UPDATE_TIME];
-    const now = Date.now();
-    this.extendedMeta = Object.fromEntries(Object.entries(meta).filter(([key]) => !META_KEYS_WHITELIST.includes(key)));
-    if (this._lastUpdateTime && isSameDay(this._lastUpdateTime, now)) {
-      this._currentIp = meta[META_KEYS.IP];
-      this._currentRegion = meta[META_KEYS.REGION];
-      return {
-        ip: this._currentIp,
-        region: this._currentRegion,
-        lastUpdateTime: this._lastUpdateTime,
-        extendedMeta: this.extendedMeta,
-      };
-    }
-
-    const { ip, region } = await fetchPublicIPAndRegion();
-    this._currentIp = ip;
-    this._currentRegion = region;
-    this._lastUpdateTime = now;
-
-    await this.setMeta(META_KEYS.LAST_UPDATE_TIME, now);
-    console.log("[log processor][setMeta] _getMeta", {lastUpdateTime: now});
-    await this.setMeta(META_KEYS.IP, this._currentIp);
-    console.log("[log processor][setMeta] _getMeta", {ip: this._currentIp});
-    await this.setMeta(META_KEYS.REGION, this._currentRegion);
-    console.log("[log processor][setMeta] _getMeta", {region: this._currentRegion});
-
-    return {
-      ip: this._currentIp,
-      region: this._currentRegion,
-      lastUpdateTime: this._lastUpdateTime,
-      extendedMeta: this.extendedMeta,
-    };
-  }
-
-  /**
-   * 处理非标准或额外元数据：校验字符串后，白名单外键写入 {@link LogProcessor#extendedMeta}，再与 IndexedDB 比对并按需持久化。
-   * @param {string} key - 元数据键
-   * @param {string} value - 元数据值
-   * @returns {Promise<void>}
-   */
-  async applyExtendedMetaIfChanged(key, value) {
-    if (typeof key !== 'string' || typeof value !== 'string') {
-      return;
-    }
-    if (!META_KEYS_WHITELIST.includes(key)) {
-      this.extendedMeta[key] = value;
-    }
-    const stored = await this.getMeta(key);
-    console.log("[log processor][getMeta] applyExtendedMetaIfChanged", {key, value, stored});
-    if (value !== stored) {
-      await this.setMeta(key, value);
-    }
-  }
-
-  /**
-   * 添加日志到存储
-   * @param {LogItem} logItem - 日志项
-   * @returns {Promise<{log: LogItem, size: number}|null>} - 返回是否成功添加
-   */
-  async insertLog(logItem) {
-    if (!logItem.content) return null;
-    let log = await this.dedupLog(logItem);
-    if (!log) return null;
-    log = await this.completeLog(log);
-    const {size = 0} = await super.insertLog(log);
-    console.log("[log processor][insertLog] insertLog res", {log, size});
-    return {log, size};
-  }
-  /**
-   * 日志去重
-   * @param {LogItem} logItem - 日志项
-   * @returns {Promise<LogItem|null>} - 去重后的日志项，如果去重成功则返回 null
-   */
-  async dedupLog(logItem) {
-    const digest = dedupContentKey(logItem.content);
-    const digestCache = await this._getLogDigestCache();
-    const lastTime = digestCache.get(digest);
-    if (lastTime) {
-      // 时间窗口内重复，丢弃
-      if (logItem.time - lastTime <= this._dedupInterval) return null;
-    }
-    // 更新摘要时间或添加新摘要
-    await this._addLogDigestCache(digest, logItem.time);
-    return logItem;
-  }
-  /**
-   * 日志补全元信息
-   * @param {LogItem} logItem - 日志项
-   * @returns {Promise<LogItem>}
-   */
-  async completeLog(logItem) {
-    const { ip, region, extendedMeta } = await this._getMeta();
-    logItem.ip = ip;
-    logItem.region = region;
-    logItem.extendedMeta = serializeSingleValue$1.call(defaultTypeHandlers, extendedMeta);
-    return logItem;
-  }
-};
-
-const instanceOfAny = (object, constructors) => constructors.some((c) => object instanceof c);
-
-let idbProxyableTypes;
-let cursorAdvanceMethods;
-// This is a function to prevent it throwing up in node environments.
-function getIdbProxyableTypes() {
-    return (idbProxyableTypes ||
-        (idbProxyableTypes = [
-            IDBDatabase,
-            IDBObjectStore,
-            IDBIndex,
-            IDBCursor,
-            IDBTransaction,
-        ]));
-}
-// This is a function to prevent it throwing up in node environments.
-function getCursorAdvanceMethods() {
-    return (cursorAdvanceMethods ||
-        (cursorAdvanceMethods = [
-            IDBCursor.prototype.advance,
-            IDBCursor.prototype.continue,
-            IDBCursor.prototype.continuePrimaryKey,
-        ]));
-}
-const transactionDoneMap = new WeakMap();
-const transformCache = new WeakMap();
-const reverseTransformCache = new WeakMap();
-function promisifyRequest(request) {
-    const promise = new Promise((resolve, reject) => {
-        const unlisten = () => {
-            request.removeEventListener('success', success);
-            request.removeEventListener('error', error);
-        };
-        const success = () => {
-            resolve(wrap(request.result));
-            unlisten();
-        };
-        const error = () => {
-            reject(request.error);
-            unlisten();
-        };
-        request.addEventListener('success', success);
-        request.addEventListener('error', error);
-    });
-    // This mapping exists in reverseTransformCache but doesn't exist in transformCache. This
-    // is because we create many promises from a single IDBRequest.
-    reverseTransformCache.set(promise, request);
-    return promise;
-}
-function cacheDonePromiseForTransaction(tx) {
-    // Early bail if we've already created a done promise for this transaction.
-    if (transactionDoneMap.has(tx))
-        return;
-    const done = new Promise((resolve, reject) => {
-        const unlisten = () => {
-            tx.removeEventListener('complete', complete);
-            tx.removeEventListener('error', error);
-            tx.removeEventListener('abort', error);
-        };
-        const complete = () => {
-            resolve();
-            unlisten();
-        };
-        const error = () => {
-            reject(tx.error || new DOMException('AbortError', 'AbortError'));
-            unlisten();
-        };
-        tx.addEventListener('complete', complete);
-        tx.addEventListener('error', error);
-        tx.addEventListener('abort', error);
-    });
-    // Cache it for later retrieval.
-    transactionDoneMap.set(tx, done);
-}
-let idbProxyTraps = {
-    get(target, prop, receiver) {
-        if (target instanceof IDBTransaction) {
-            // Special handling for transaction.done.
-            if (prop === 'done')
-                return transactionDoneMap.get(target);
-            // Make tx.store return the only store in the transaction, or undefined if there are many.
-            if (prop === 'store') {
-                return receiver.objectStoreNames[1]
-                    ? undefined
-                    : receiver.objectStore(receiver.objectStoreNames[0]);
-            }
-        }
-        // Else transform whatever we get back.
-        return wrap(target[prop]);
-    },
-    set(target, prop, value) {
-        target[prop] = value;
-        return true;
-    },
-    has(target, prop) {
-        if (target instanceof IDBTransaction &&
-            (prop === 'done' || prop === 'store')) {
-            return true;
-        }
-        return prop in target;
-    },
-};
-function replaceTraps(callback) {
-    idbProxyTraps = callback(idbProxyTraps);
-}
-function wrapFunction(func) {
-    // Due to expected object equality (which is enforced by the caching in `wrap`), we
-    // only create one new func per func.
-    // Cursor methods are special, as the behaviour is a little more different to standard IDB. In
-    // IDB, you advance the cursor and wait for a new 'success' on the IDBRequest that gave you the
-    // cursor. It's kinda like a promise that can resolve with many values. That doesn't make sense
-    // with real promises, so each advance methods returns a new promise for the cursor object, or
-    // undefined if the end of the cursor has been reached.
-    if (getCursorAdvanceMethods().includes(func)) {
-        return function (...args) {
-            // Calling the original function with the proxy as 'this' causes ILLEGAL INVOCATION, so we use
-            // the original object.
-            func.apply(unwrap(this), args);
-            return wrap(this.request);
-        };
-    }
-    return function (...args) {
-        // Calling the original function with the proxy as 'this' causes ILLEGAL INVOCATION, so we use
-        // the original object.
-        return wrap(func.apply(unwrap(this), args));
-    };
-}
-function transformCachableValue(value) {
-    if (typeof value === 'function')
-        return wrapFunction(value);
-    // This doesn't return, it just creates a 'done' promise for the transaction,
-    // which is later returned for transaction.done (see idbObjectHandler).
-    if (value instanceof IDBTransaction)
-        cacheDonePromiseForTransaction(value);
-    if (instanceOfAny(value, getIdbProxyableTypes()))
-        return new Proxy(value, idbProxyTraps);
-    // Return the same value back if we're not going to transform it.
-    return value;
-}
-function wrap(value) {
-    // We sometimes generate multiple promises from a single IDBRequest (eg when cursoring), because
-    // IDB is weird and a single IDBRequest can yield many responses, so these can't be cached.
-    if (value instanceof IDBRequest)
-        return promisifyRequest(value);
-    // If we've already transformed this value before, reuse the transformed value.
-    // This is faster, but it also provides object equality.
-    if (transformCache.has(value))
-        return transformCache.get(value);
-    const newValue = transformCachableValue(value);
-    // Not all types are transformed.
-    // These may be primitive types, so they can't be WeakMap keys.
-    if (newValue !== value) {
-        transformCache.set(value, newValue);
-        reverseTransformCache.set(newValue, value);
-    }
-    return newValue;
-}
-const unwrap = (value) => reverseTransformCache.get(value);
-
-/**
- * Open a database.
- *
- * @param name Name of the database.
- * @param version Schema version.
- * @param callbacks Additional callbacks.
- */
-function openDB(name, version, { blocked, upgrade, blocking, terminated } = {}) {
-    const request = indexedDB.open(name, version);
-    const openPromise = wrap(request);
-    if (upgrade) {
-        request.addEventListener('upgradeneeded', (event) => {
-            upgrade(wrap(request.result), event.oldVersion, event.newVersion, wrap(request.transaction), event);
-        });
-    }
-    if (blocked) {
-        request.addEventListener('blocked', (event) => blocked(
-        // Casting due to https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/1405
-        event.oldVersion, event.newVersion, event));
-    }
-    openPromise
-        .then((db) => {
-        if (terminated)
-            db.addEventListener('close', () => terminated());
-        if (blocking) {
-            db.addEventListener('versionchange', (event) => blocking(event.oldVersion, event.newVersion, event));
-        }
-    })
-        .catch(() => { });
-    return openPromise;
-}
-
-const readMethods = ['get', 'getKey', 'getAll', 'getAllKeys', 'count'];
-const writeMethods = ['put', 'add', 'delete', 'clear'];
-const cachedMethods = new Map();
-function getMethod(target, prop) {
-    if (!(target instanceof IDBDatabase &&
-        !(prop in target) &&
-        typeof prop === 'string')) {
-        return;
-    }
-    if (cachedMethods.get(prop))
-        return cachedMethods.get(prop);
-    const targetFuncName = prop.replace(/FromIndex$/, '');
-    const useIndex = prop !== targetFuncName;
-    const isWrite = writeMethods.includes(targetFuncName);
-    if (
-    // Bail if the target doesn't exist on the target. Eg, getAll isn't in Edge.
-    !(targetFuncName in (useIndex ? IDBIndex : IDBObjectStore).prototype) ||
-        !(isWrite || readMethods.includes(targetFuncName))) {
-        return;
-    }
-    const method = async function (storeName, ...args) {
-        // isWrite ? 'readwrite' : undefined gzipps better, but fails in Edge :(
-        const tx = this.transaction(storeName, isWrite ? 'readwrite' : 'readonly');
-        let target = tx.store;
-        if (useIndex)
-            target = target.index(args.shift());
-        // Must reject if op rejects.
-        // If it's a write operation, must reject if tx.done rejects.
-        // Must reject with op rejection first.
-        // Must resolve with op value.
-        // Must handle both promises (no unhandled rejections)
-        return (await Promise.all([
-            target[targetFuncName](...args),
-            isWrite && tx.done,
-        ]))[0];
-    };
-    cachedMethods.set(prop, method);
-    return method;
-}
-replaceTraps((oldTraps) => ({
-    ...oldTraps,
-    get: (target, prop, receiver) => getMethod(target, prop) || oldTraps.get(target, prop, receiver),
-    has: (target, prop) => !!getMethod(target, prop) || oldTraps.has(target, prop),
-}));
-
-const advanceMethodProps = ['continue', 'continuePrimaryKey', 'advance'];
-const methodMap = {};
-const advanceResults = new WeakMap();
-const ittrProxiedCursorToOriginalProxy = new WeakMap();
-const cursorIteratorTraps = {
-    get(target, prop) {
-        if (!advanceMethodProps.includes(prop))
-            return target[prop];
-        let cachedFunc = methodMap[prop];
-        if (!cachedFunc) {
-            cachedFunc = methodMap[prop] = function (...args) {
-                advanceResults.set(this, ittrProxiedCursorToOriginalProxy.get(this)[prop](...args));
-            };
-        }
-        return cachedFunc;
-    },
-};
-async function* iterate(...args) {
-    // tslint:disable-next-line:no-this-assignment
-    let cursor = this;
-    if (!(cursor instanceof IDBCursor)) {
-        cursor = await cursor.openCursor(...args);
-    }
-    if (!cursor)
-        return;
-    cursor = cursor;
-    const proxiedCursor = new Proxy(cursor, cursorIteratorTraps);
-    ittrProxiedCursorToOriginalProxy.set(proxiedCursor, cursor);
-    // Map this double-proxy back to the original, so other cursor methods work.
-    reverseTransformCache.set(proxiedCursor, unwrap(cursor));
-    while (cursor) {
-        yield proxiedCursor;
-        // If one of the advancing methods was not called, call continue().
-        cursor = await (advanceResults.get(proxiedCursor) || cursor.continue());
-        advanceResults.delete(proxiedCursor);
-    }
-}
-function isIteratorProp(target, prop) {
-    return ((prop === Symbol.asyncIterator &&
-        instanceOfAny(target, [IDBIndex, IDBObjectStore, IDBCursor])) ||
-        (prop === 'iterate' && instanceOfAny(target, [IDBIndex, IDBObjectStore])));
-}
-replaceTraps((oldTraps) => ({
-    ...oldTraps,
-    get(target, prop, receiver) {
-        if (isIteratorProp(target, prop))
-            return iterate;
-        return oldTraps.get(target, prop, receiver);
-    },
-    has(target, prop) {
-        return isIteratorProp(target, prop) || oldTraps.has(target, prop);
-    },
-}));
-
 // code generated by pbf v4.0.1
 
 
 function readLogItem(pbf, end) {
-    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", userAgent: "", screen: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
+    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
 }
 function readLogItemField(tag, obj, pbf) {
     if (tag === 1) obj.time = pbf.readVarint(true);
     else if (tag === 2) obj.level = pbf.readString();
     else if (tag === 3) obj.content = pbf.readString();
     else if (tag === 4) obj.clientUuid = pbf.readString();
-    else if (tag === 5) obj.userAgent = pbf.readString();
-    else if (tag === 6) obj.screen = pbf.readString();
     else if (tag === 7) obj.window = pbf.readString();
     else if (tag === 8) obj.url = pbf.readString();
     else if (tag === 9) obj.ip = pbf.readString();
@@ -3703,8 +3880,6 @@ function writeLogItem(obj, pbf) {
     if (obj.level) pbf.writeStringField(2, obj.level);
     if (obj.content) pbf.writeStringField(3, obj.content);
     if (obj.clientUuid) pbf.writeStringField(4, obj.clientUuid);
-    if (obj.userAgent) pbf.writeStringField(5, obj.userAgent);
-    if (obj.screen) pbf.writeStringField(6, obj.screen);
     if (obj.window) pbf.writeStringField(7, obj.window);
     if (obj.url) pbf.writeStringField(8, obj.url);
     if (obj.ip) pbf.writeStringField(9, obj.ip);
@@ -3738,6 +3913,28 @@ function writeLogItem_FieldEntry14(obj, pbf) {
     if (obj.key) pbf.writeStringField(1, obj.key);
     if (obj.value) pbf.writeStringField(2, obj.value);
 }
+
+/**
+ * 日志持久化抽象基类：约定与 `idb` 的 `IDBPDatabase` 相近的 CRUD 形态，
+ * 由具体环境子类（如 Web IndexedDB）实现。
+ *
+ * 持久化相关钩子统一使用 **`ls` 前缀**（log storage），降低与中间层、
+ * 业务子类方法名（如 `add` / `get`）冲突、误覆盖的风险。
+ *
+ * 各 `ls*` 方法第一个参数均为对象仓库名（store name），与 `LogStore` 中
+ * `b_dat` / `digestCache` / `meta` 等常量对应；`lsDeleteMany` 按条件批量删除（如按 `timestamp`）；
+ * `lsGetStoreSize` 用游标累加各条 value 的负载字节数（非引擎磁盘占用）。
+ * `lsInit` 仅做参数校验；连接打开、upgrade 与状态字段由**平台层**实现。
+ */
+
+
+const DB_NAME = 'beacon-db';
+const DB_VERSION = 1;
+
+// 定义对象存储区的名称
+const STORE_LOGS = 'b_dat';
+const STORE_DIGEST = 'digestCache';
+const STORE_META = 'meta';
 
 const MixinLogStore = (BaseClass) => {
   /**
@@ -3804,19 +4001,15 @@ const MixinLogStore = (BaseClass) => {
     _idbValuePayloadBytes(value) {
       if (value == null) return 0;
       if (typeof value === 'string') {
-        console.log("[log store web][_idbValuePayloadBytes]", { value });
         return new TextEncoder().encode(value).length;
       }
       if (value instanceof ArrayBuffer) {
-        console.log("[log store web][_idbValuePayloadBytes]", { value, byteLength: value.byteLength });
         return value.byteLength;
       }
       if (ArrayBuffer.isView(value)) {
-        console.log("[log store web][_idbValuePayloadBytes]", { value, byteLength: value.byteLength });
         return value.byteLength;
       }
       try {
-        console.log("[log store web][_idbValuePayloadBytes]", { value, length: new TextEncoder().encode(JSON.stringify(value)).length });
         return new TextEncoder().encode(JSON.stringify(value)).length;
       } catch {
         return 0;
@@ -3835,7 +4028,6 @@ const MixinLogStore = (BaseClass) => {
       let cursor = await store.openCursor();
       while (cursor) {
         total += this._idbValuePayloadBytes(cursor.value);
-        console.log("[log store web][lsGetStoreSize]", { total, value: cursor.value });
         cursor = await cursor.continue();
       }
       await tx.done;
@@ -3849,7 +4041,7 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Uint8Array} 编码后的二进制数据。
      */
     _encode(data) {
-      return utf8Bytes(data);
+      return utf8Bytes$1(data);
     }
 
     /**
@@ -3871,7 +4063,7 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Promise<number>} 解析为新日志记录ID的 Promise。
      */
     async lsAdd(storeName, value) {
-      console.log("[log store web][lsAdd]", { storeName, value });
+      console.log("indexeddb add", storeName, value);
       const db = await this._getDB();
       if (storeName === STORE_LOGS) {
         value = this.encodeLog(value);
@@ -3899,7 +4091,6 @@ const MixinLogStore = (BaseClass) => {
         }
 
         await tx.done;
-        console.log("[log store web][lsGetAll]", { storeName, keys: Object.keys(allMeta).length });
         return allMeta;
       }
       if (storeName === STORE_LOGS) {
@@ -3909,7 +4100,6 @@ const MixinLogStore = (BaseClass) => {
         });
       }
       const rows = await db.getAll(storeName);
-      console.log("[log store web][lsGetAll]", { storeName, count: rows.length });
       return rows;
     }
 
@@ -3920,7 +4110,6 @@ const MixinLogStore = (BaseClass) => {
     async lsClear(storeName) {
       const db = await this._getDB();
       await db.clear(storeName);
-      console.log("[log store web][lsClear]", { storeName });
     }
 
     // --- 摘要 (digestCache) 操作 ---
@@ -3949,7 +4138,6 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Promise<any | null>} 解析为解码后的元数据值的 Promise，如果不存在则为 null。
      */
     async lsGet(storeName, key) {
-      console.log("[log store web][lsGet]", { storeName, key });
       const db = await this._getDB();
       const value = await db.get(storeName, key);
       if (storeName === STORE_META) {
@@ -3979,7 +4167,6 @@ const MixinLogStore = (BaseClass) => {
         cursor = await cursor.continue();
       }
       await tx.done;
-      console.log("[log store web][lsDeleteMany]", { storeName, lte });
     }
 
     /**
@@ -4013,7 +4200,7 @@ const generateLog = () => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       const logProcessor = new LogProcessor();
       const uaSerialized = JSON.stringify(
-        serializeSingleValue(UAParser(navigator.userAgent))
+        serializeSingleValue$1(UAParser(navigator.userAgent))
       );
       const screenSerialized = JSON.stringify({
         width: window.screen.width,
@@ -4029,7 +4216,6 @@ const generateLog = () => {
 
       // 发送事件
       const sendSWEvent = (msg) => {
-        console.log("[logbeacon] sendSWEvent", msg, "发送方式: ", initInfo.serviceWorker ? "Service Worker" : "CustomEvent");
         if (initInfo.serviceWorker) {
           return initInfo.serviceWorker.postMessage(msg);
         }
@@ -4111,10 +4297,8 @@ const generateLog = () => {
 
       // 立即注册 Service Worker
       registerServiceWorker();
-      console.log("[logbeacon] 注册visibilitychange监听", window.addEventListener);
       // 前后台切换事件
       document.addEventListener('visibilitychange', async function() {
-        console.log("[logbeacon] visibilitychange", document.visibilityState);
         const extraInfo = getLogExtraInfo();
         if (document.visibilityState === 'hidden') {
           sendSWEvent({
@@ -4223,8 +4407,5 @@ const generateLog = () => {
   }
 };
 
-// 使用自执行函数，将依赖作为参数传入
-(function() {
-  // 在 document 就绪时执行的函数
-  generateLog();
-})();
+/** 作为 `<script type="module">` 入口加载时立即初始化（与原先 sls/loki/beacon.js 行为一致）。 */
+generateLog();

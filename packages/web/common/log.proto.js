@@ -11,15 +11,13 @@ export function writeLogBatch(obj, pbf) {
 }
 
 export function readLogItem(pbf, end) {
-    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", userAgent: "", screen: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
+    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
 }
 function readLogItemField(tag, obj, pbf) {
     if (tag === 1) obj.time = pbf.readVarint(true);
     else if (tag === 2) obj.level = pbf.readString();
     else if (tag === 3) obj.content = pbf.readString();
     else if (tag === 4) obj.clientUuid = pbf.readString();
-    else if (tag === 5) obj.userAgent = pbf.readString();
-    else if (tag === 6) obj.screen = pbf.readString();
     else if (tag === 7) obj.window = pbf.readString();
     else if (tag === 8) obj.url = pbf.readString();
     else if (tag === 9) obj.ip = pbf.readString();
@@ -34,8 +32,6 @@ export function writeLogItem(obj, pbf) {
     if (obj.level) pbf.writeStringField(2, obj.level);
     if (obj.content) pbf.writeStringField(3, obj.content);
     if (obj.clientUuid) pbf.writeStringField(4, obj.clientUuid);
-    if (obj.userAgent) pbf.writeStringField(5, obj.userAgent);
-    if (obj.screen) pbf.writeStringField(6, obj.screen);
     if (obj.window) pbf.writeStringField(7, obj.window);
     if (obj.url) pbf.writeStringField(8, obj.url);
     if (obj.ip) pbf.writeStringField(9, obj.ip);

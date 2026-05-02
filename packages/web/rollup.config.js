@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import resolve from '@rollup/plugin-node-resolve';
@@ -8,61 +7,33 @@ import terser from '@rollup/plugin-terser';
 import copyTypes from './rollup-plugin-copy-types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+/** `rollup` 入口直接指向 platforms 包内文件（非 `@logbeacon/platforms/*` 解析） */
+const platformsDir = path.resolve(__dirname, '../platforms');
+
+const WEB_CORE_LOG_AGGREGATOR_PLACEHOLDER =
+  'logbeacon-internal:core-log-aggregator';
 
 /**
- * 将 `@logbeacon/core/<子路径>` 解析到 `packages/core` 源码（根据 core 的 package.json `exports`）。
- * 解决如 `@logbeacon/core/LogProcessor.js` 与 exports 中 `./LogProcessor` 不一致导致无法解析、被打成外部 import 的问题。
+ * `common/LogAggregator.js` 顶部占位导入：按变体解析到 `@logbeacon/core/LogAggregator-sls|loki`（由 node-resolve 按 core 的 exports 打进 bundle）。
  * 必须放在 `@rollup/plugin-node-resolve` 之前。
+ * @param {'sls' | 'loki'} variant
  */
-function createResolveLogbeaconCorePlugin() {
-  const corePkgPath = path.resolve(__dirname, '../core/package.json');
-  const coreDir = path.dirname(corePkgPath);
-  /** @type {Record<string, string>} exports 子路径（无 `./`、无 `.js` 后缀）-> 绝对路径 */
-  const subpathToFile = {};
-  try {
-    const pkg = JSON.parse(readFileSync(corePkgPath, 'utf8'));
-    for (const [exportKey, val] of Object.entries(pkg.exports || {})) {
-      if (exportKey === '.') continue;
-      const sub = exportKey.replace(/^\.\//, '');
-      const target =
-        typeof val === 'string' ? val : val.import || val.default;
-      if (typeof target !== 'string') continue;
-      subpathToFile[sub] = path.resolve(coreDir, target);
-    }
-  } catch {
-    // 若读取失败则仅跳过本插件解析
-  }
-
+function createWebCoreLogAggregatorPlaceholderPlugin(variant) {
+  const target =
+    variant === 'sls'
+      ? '@logbeacon/core/LogAggregator-sls'
+      : '@logbeacon/core/LogAggregator-loki';
   return {
-    name: 'resolve-logbeacon-core',
-    resolveId(id) {
-      if (!id.startsWith('@logbeacon/core/')) return null;
-      let sub = id.slice('@logbeacon/core/'.length);
-      if (sub.endsWith('.js')) sub = sub.slice(0, -3);
-      return subpathToFile[sub] ?? null;
+    name: `core-log-aggregator-${variant}`,
+    async resolveId(id, importer) {
+      if (id !== WEB_CORE_LOG_AGGREGATOR_PLACEHOLDER) return null;
+      const resolved = await this.resolve(target, importer, {
+        skipSelf: true,
+      });
+      return resolved?.id ?? null;
     },
   };
 }
-
-const resolveLogbeaconCorePlugin = createResolveLogbeaconCorePlugin();
-
-/**
- * `idb` 仅在 `packages/web` 声明依赖；从 `packages/core` 内文件解析 `idb` 时默认找不到 sibling 包的 node_modules，
- * Rollup 会把 `import 'idb'` 留成 external。此处强制指向本包 node_modules 内的 ESM 入口以便打进 bundle。
- */
-function createResolveIdbForBundledDepsPlugin() {
-  const idbEntry = path.resolve(__dirname, 'node_modules/idb/build/index.js');
-  const resolved = existsSync(idbEntry) ? idbEntry : null;
-  return {
-    name: 'resolve-idb-bundled',
-    resolveId(id) {
-      if (id !== 'idb') return null;
-      return resolved;
-    },
-  };
-}
-
-const resolveIdbPlugin = createResolveIdbForBundledDepsPlugin();
 
 /**
  * terser 插件的配置项
@@ -136,8 +107,6 @@ export default [
       },
     ],
     plugins: [
-      resolveLogbeaconCorePlugin,
-      resolveIdbPlugin,
       resolvePlugin,
       commonjsPlugin,
       terserPlugin,
@@ -151,10 +120,9 @@ export default [
     // 外部依赖配置，这些依赖不会被打包进最终文件，而是在运行时加载
     // external: ['loglevel', 'ua-parser-js', 'fflate', 'pbf']
   },
-  // service worker
+  // service worker（入口统一 browser/beacon-sw.js，占位符区分 SLS / Loki 编码）
   {
-    // 入口文件路径
-    input: 'sls/beacon-sw.js',
+    input: 'browser/beacon-sw.js',
     output: {
       file: 'dist/sls/beacon-sw.js',
       format: 'esm',
@@ -162,8 +130,7 @@ export default [
     },
     // 使用上面定义的插件数组
     plugins: [
-      resolveLogbeaconCorePlugin,
-      resolveIdbPlugin,
+      createWebCoreLogAggregatorPlaceholderPlugin('sls'),
       resolvePlugin,
       commonjsPlugin,
       terserPlugin,
@@ -175,10 +142,9 @@ export default [
       propertyReadSideEffects: false    // 假设属性读取没有副作用，可以更积极地移除未使用的代码
     }
   },
-  // script 标签
+  // script 标签（入口统一 browser/beacon.js，输出到 sls / loki 路径）
   {
-    // 入口文件路径
-    input: 'sls/beacon.js',
+    input: 'browser/beacon.js',
     output: [
       {
         ...outputConfig,
@@ -188,8 +154,6 @@ export default [
     ],
     // 使用上面定义的插件数组
     plugins: [
-      resolveLogbeaconCorePlugin,
-      resolveIdbPlugin,
       resolvePlugin,
       commonjsPlugin,
       terserPlugin,
@@ -201,9 +165,9 @@ export default [
       propertyReadSideEffects: false    // 假设属性读取没有副作用
     }
   },
-  // 服务端
+  // 服务端（入口直接使用 platforms，省略 packages/web/sls 薄封装）
   {
-    input: 'sls/slsClient.js',
+    input: path.join(platformsDir, 'sls/slsClient.js'),
     output: [
       {
         ...outputConfig,
@@ -219,8 +183,6 @@ export default [
       },
     ],
     plugins: [
-      resolveLogbeaconCorePlugin,
-      resolveIdbPlugin,
       resolve({
         browser: false, // 优先使用为浏览器环境准备的模块
         preferBuiltins: true // 不优先使用 Node.js 内置模块
@@ -237,10 +199,8 @@ export default [
     // 外部依赖配置，这些依赖不会被打包进最终文件，而是在运行时加载
     // external: ['loglevel', 'ua-parser-js', 'fflate', 'pbf']
   },
-  // service worker
   {
-    // 入口文件路径
-    input: 'loki/beacon-sw.js',
+    input: 'browser/beacon-sw.js',
     output: {
       file: 'dist/loki/beacon-sw.js',
       format: 'esm',
@@ -248,8 +208,7 @@ export default [
     },
     // 使用上面定义的插件数组
     plugins: [
-      resolveLogbeaconCorePlugin,
-      resolveIdbPlugin,
+      createWebCoreLogAggregatorPlaceholderPlugin('loki'),
       resolvePlugin,
       commonjsPlugin,
       terserPlugin,
@@ -261,10 +220,8 @@ export default [
       propertyReadSideEffects: false    // 假设属性读取没有副作用，可以更积极地移除未使用的代码
     }
   },
-  // script 标签
   {
-    // 入口文件路径
-    input: 'loki/beacon.js',
+    input: 'browser/beacon.js',
     output: [
       {
         file: 'dist/loki/beacon.js',
@@ -274,8 +231,6 @@ export default [
     ],
     // 使用上面定义的插件数组
     plugins: [
-      resolveLogbeaconCorePlugin,
-      resolveIdbPlugin,
       resolvePlugin,
       commonjsPlugin,
       terserPlugin,
@@ -287,9 +242,8 @@ export default [
       propertyReadSideEffects: false    // 假设属性读取没有副作用
     }
   },
-  // 服务端
   {
-    input: 'loki/lokiClient.js',
+    input: path.join(platformsDir, 'loki/lokiClient.js'),
     output: [
       {
         ...outputConfig,
@@ -305,8 +259,6 @@ export default [
       },
     ],
     plugins: [
-      resolveLogbeaconCorePlugin,
-      resolveIdbPlugin,
       resolve({
         browser: false, // 优先使用为浏览器环境准备的模块
         preferBuiltins: true // 不优先使用 Node.js 内置模块

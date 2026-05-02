@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "sync-beacon": "node ./scripts/sync-beacon.mjs",
-    "predev": "pnpm run sync-beacon",
-    "dev": "next dev -p 3100",
+    "dev": "node ./scripts/sync-beacon.mjs --watch",
     "prebuild": "pnpm run sync-beacon",
     "build": "next build",
     "start": "next start -p 3100"

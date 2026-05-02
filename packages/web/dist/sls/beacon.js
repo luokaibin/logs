@@ -14,18 +14,12 @@ function createMemoryStorage() {
   };
 }
 
-/** FNV-1a 64-bit：offset basis */
-const FNV1A_64_OFFSET = 14695981039346656037n;
-/** FNV-1a 64-bit：prime */
-const FNV1A_64_PRIME = 1099511628211n;
-const FNV1A_64_MASK = 0xffffffffffffffffn;
-
 /**
  * UTF-8 字节序列；优先用全局 `TextEncoder`（浏览器 / 现代 Node / RN），否则纯 JS 回退（如旧 Node 无全局 TextEncoder）。
  * @param {string} str
  * @returns {Uint8Array}
  */
-function utf8Bytes(str) {
+function utf8Bytes$1(str) {
   if (typeof TextEncoder !== "undefined") {
     return new TextEncoder().encode(str);
   }
@@ -57,52 +51,6 @@ function utf8Bytes(str) {
     }
   }
   return new Uint8Array(out);
-}
-
-/**
- * 为日志正文生成去重键（FNV-1a 64-bit，输入按 UTF-8 字节计算）。
- * 同步、轻量，不依赖 crypto.subtle；需运行环境支持 **BigInt**（Node 10+、现代浏览器与 Hermes）。
- * 非密码学强度，仅用于短时间窗内的内容去重。
- * @param {string} str
- * @returns {string} 固定 16 位十六进制小写字符串
- */
-function dedupContentKey(str) {
-  const bytes = utf8Bytes(str);
-  let h = FNV1A_64_OFFSET;
-  for (let i = 0; i < bytes.length; i++) {
-    h ^= BigInt(bytes[i]);
-    h = (h * FNV1A_64_PRIME) & FNV1A_64_MASK;
-  }
-  return h.toString(16).padStart(16, "0");
-}
-
-/**
- * 判断两个时间戳是否为同一天
- * @param {number} ts1 毫秒级时间戳
- * @param {number} ts2 毫秒级时间戳
- * @returns {boolean}
- */
-function isSameDay(ts1, ts2) {
-  const d1 = new Date(Number(ts1));
-  const d2 = new Date(Number(ts2));
-  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
-}
-
-/**
- * 请求公网IP和地区（使用 geojs）
- * @returns {Promise<{ip?: string, region?: string}>}
- */
-async function fetchPublicIPAndRegion() {
-  try {
-    const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
-    if (!res.ok) return {};
-    const data = await res.json();
-    const ip = data.ip;
-    const region = data.country;
-    return { ip, region };
-  } catch (e) {
-    return {};
-  }
 }
 
 /**
@@ -220,7 +168,7 @@ function getLogExtraInfo$1() {
 }
 
 // 默认的数组采样规则
-const ARRAY_SAMPLING_CONFIG = {
+const ARRAY_SAMPLING_CONFIG$1 = {
   primitive: {
     threshold: 20, // 对简单数组保持宽松的阈值
     head: 10,      // 保留足够的上下文
@@ -238,9 +186,6 @@ const ARRAY_SAMPLING_CONFIG = {
 // 序列化后日志字符串的最大长度
 const MAX_LOG_LENGTH = 100000;
 
-/** 无浏览器特化时的空处理器表；直接调用 core 导出时请使用 `.call(defaultTypeHandlers, …)` 或与 web 包一样 `.bind(handlers)` */
-const defaultTypeHandlers = new Map();
-
 /**
  * 递归地将值转换为可 JSON 序列化的格式。
  * @param {any} value - 需要序列化的值。
@@ -251,7 +196,7 @@ const defaultTypeHandlers = new Map();
  * @param {WeakSet} [seen=new WeakSet()] - 用于检测循环引用的集合，用于递归。
  * @returns {any} 可序列化的值。
  */
-function serializeSingleValue$1(
+function serializeSingleValue$2(
   value,
   options = {
     maxDepth: 10,
@@ -319,14 +264,14 @@ function serializeSingleValue$1(
     const obj = {};
     for (const [k, v] of value.entries()) {
       const keyStr = typeof k === 'object' && k !== null ? '[object]' : String(k);
-      obj[keyStr] = serializeSingleValue$1.call(this, v, options, currentDepth + 1, seen);
+      obj[keyStr] = serializeSingleValue$2.call(this, v, options, currentDepth + 1, seen);
     }
     return obj;
   }
   if (typeof Set !== 'undefined' && value instanceof Set) {
     const arr = [];
     for (const v of value.values()) {
-      arr.push(serializeSingleValue$1.call(this, v, options, currentDepth + 1, seen));
+      arr.push(serializeSingleValue$2.call(this, v, options, currentDepth + 1, seen));
     }
     return arr;
   }
@@ -334,11 +279,11 @@ function serializeSingleValue$1(
   // 处理数组 (包括采样逻辑)
   if (Array.isArray(value)) {
     const isComplex = value.length > 0 && typeof value[0] === 'object' && value[0] !== null;
-    const rules = isComplex ? ARRAY_SAMPLING_CONFIG.complex : ARRAY_SAMPLING_CONFIG.primitive;
+    const rules = isComplex ? ARRAY_SAMPLING_CONFIG$1.complex : ARRAY_SAMPLING_CONFIG$1.primitive;
 
     // 卫语句：如果未达到采样阈值，则正常处理并提前返回
     if (value.length <= rules.threshold) {
-      return value.map(item => serializeSingleValue$1.call(this, item, options, currentDepth + 1, seen));
+      return value.map(item => serializeSingleValue$2.call(this, item, options, currentDepth + 1, seen));
     }
 
     // --- 采样逻辑开始 ---
@@ -361,7 +306,7 @@ function serializeSingleValue$1(
 
     const sortedIndices = Array.from(indices).sort((a, b) => a - b);
     for (const index of sortedIndices) {
-      sampledResult._e[index] = serializeSingleValue$1.call(this, value[index], options, currentDepth + 1, seen);
+      sampledResult._e[index] = serializeSingleValue$2.call(this, value[index], options, currentDepth + 1, seen);
     }
 
     return sampledResult;
@@ -371,7 +316,7 @@ function serializeSingleValue$1(
   if (typeof value === 'object' && value !== null) {
      // 检查是否有自定义的 toJSON 方法
     if (typeof value.toJSON === 'function') {
-      return serializeSingleValue$1.call(this, value.toJSON(), options, currentDepth + 1, seen);
+      return serializeSingleValue$2.call(this, value.toJSON(), options, currentDepth + 1, seen);
     }
 
     const result = {};
@@ -379,7 +324,7 @@ function serializeSingleValue$1(
       if (sensitiveKeys.includes(key.toLowerCase())) {
         result[key] = '[敏感信息已过滤]';
       } else {
-        result[key] = serializeSingleValue$1.call(this, value[key], options, currentDepth + 1, seen);
+        result[key] = serializeSingleValue$2.call(this, value[key], options, currentDepth + 1, seen);
       }
     }
     return result;
@@ -395,7 +340,7 @@ function serializeSingleValue$1(
  * @returns {string} 序列化后的 JSON 字符串。
  */
 function serializeLogContent$1(content) {
-  const serializableObject = serializeSingleValue$1.call(this, content);
+  const serializableObject = serializeSingleValue$2.call(this, content);
 
   try {
     const result = JSON.stringify(serializableObject);
@@ -418,19 +363,19 @@ if (typeof window !== 'undefined') {
     filename: value.filename,
     lineno: value.lineno,
     colno: value.colno,
-    error: serializeSingleValue(value.error, options, currentDepth + 1, seen),
+    error: serializeSingleValue$1(value.error, options, currentDepth + 1, seen),
   }));
 
   // PromiseRejectionEvent 处理器
   browserTypeHandlers.set(window.PromiseRejectionEvent, (value, options, currentDepth, seen) => ({
     _t: 'PromiseRejectionEvent',
-    reason: serializeSingleValue(value.reason, options, currentDepth + 1, seen),
+    reason: serializeSingleValue$1(value.reason, options, currentDepth + 1, seen),
   }));
 
   // MessageEvent 处理器
   browserTypeHandlers.set(window.MessageEvent, (value, options, currentDepth, seen) => ({
     _t: 'MessageEvent',
-    data: serializeSingleValue(value.data, options, currentDepth + 1, seen),
+    data: serializeSingleValue$1(value.data, options, currentDepth + 1, seen),
     origin: value.origin,
     lastEventId: value.lastEventId,
     source: '[WindowProxy]', // source 是一个 window proxy, 不能直接序列化
@@ -448,7 +393,7 @@ if (typeof window !== 'undefined') {
   browserTypeHandlers.set(window.CustomEvent, (value, options, currentDepth, seen) => ({
     _t: 'CustomEvent',
     type: value.type,
-    detail: serializeSingleValue(value.detail, options, currentDepth + 1, seen),
+    detail: serializeSingleValue$1(value.detail, options, currentDepth + 1, seen),
     bubbles: value.bubbles,
     cancelable: value.cancelable,
     composed: value.composed,
@@ -499,7 +444,7 @@ if (typeof window !== 'undefined') {
   );
 }
 
-const serializeSingleValue = serializeSingleValue$1.bind(browserTypeHandlers);
+const serializeSingleValue$1 = serializeSingleValue$2.bind(browserTypeHandlers);
 const serializeLogContent = serializeLogContent$1.bind(browserTypeHandlers);
 
 /**
@@ -2189,13 +2134,13 @@ class LogStorageBase {
   }
 }
 
-const DB_NAME = 'beacon-db';
-const DB_VERSION = 1;
+const DB_NAME$1 = 'beacon-db';
+const DB_VERSION$1 = 1;
 
 // 定义对象存储区的名称
-const STORE_LOGS = 'b_dat';
-const STORE_DIGEST = 'digestCache';
-const STORE_META = 'meta';
+const STORE_LOGS$1 = 'b_dat';
+const STORE_DIGEST$1 = 'digestCache';
+const STORE_META$1 = 'meta';
 
 /**
  * LogStore — 面向「日志 / digest / meta」的领域 API，通过 {@link LogStorageBase} 的 `ls*` 钩子由平台层实现持久化。
@@ -2205,7 +2150,7 @@ class LogStore extends LogStorageBase {
 
   constructor() {
     super();
-    this.lsInit(DB_NAME, DB_VERSION, [STORE_LOGS, STORE_DIGEST, STORE_META]);
+    this.lsInit(DB_NAME$1, DB_VERSION$1, [STORE_LOGS$1, STORE_DIGEST$1, STORE_META$1]);
   }
 
   // --- 日志 (b_dat) 操作 ---
@@ -2217,7 +2162,7 @@ class LogStore extends LogStorageBase {
    */
   async insertLog(logData) {
     // 注意：IndexedDB add/put 的返回值是 key
-    return this.lsAdd(STORE_LOGS, logData);
+    return this.lsAdd(STORE_LOGS$1, logData);
   }
 
   /**
@@ -2225,7 +2170,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<object[]>} 解析为所有日志记录数组的 Promise。
    */
   async getAllLogs() {
-    return this.lsGetAll(STORE_LOGS);
+    return this.lsGetAll(STORE_LOGS$1);
   }
 
   /**
@@ -2233,7 +2178,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<number>} 解析为所有日志记录字节数的 Promise。
    */
   async getAllLogsBytes() {
-    return this.lsGetStoreSize(STORE_LOGS);
+    return this.lsGetStoreSize(STORE_LOGS$1);
   }
 
   /**
@@ -2241,7 +2186,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<void>}
    */
   async clearLogs() {
-    await this.lsClear(STORE_LOGS);
+    await this.lsClear(STORE_LOGS$1);
   }
 
   // --- 摘要 (digestCache) 操作 ---
@@ -2253,7 +2198,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<string>} 解析为摘要键的 Promise。
    */
   async setDigest(digest, timestamp) {
-    return this.lsPut(STORE_DIGEST, { digest, timestamp });
+    return this.lsPut(STORE_DIGEST$1, { digest, timestamp });
   }
 
   /**
@@ -2261,7 +2206,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<object[]>} 解析为所有摘要记录数组的 Promise。
    */
   async getAllDigests() {
-    return this.lsGetAll(STORE_DIGEST);
+    return this.lsGetAll(STORE_DIGEST$1);
   }
 
   /**
@@ -2270,7 +2215,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<void>}
    */
   async clearOldDigests(maxAgeTimestamp) {
-    await this.lsDeleteMany(STORE_DIGEST, { timestamp: { $lte: maxAgeTimestamp } });
+    await this.lsDeleteMany(STORE_DIGEST$1, { timestamp: { $lte: maxAgeTimestamp } });
   }
 
   // --- 元数据 (meta) 操作 ---
@@ -2282,7 +2227,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<string>} 解析为元数据键的 Promise。
    */
   async setMeta(key, value) {
-    return this.lsPut(STORE_META, value, key);
+    return this.lsPut(STORE_META$1, value, key);
   }
 
   /**
@@ -2291,7 +2236,7 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<any | null>} 解析为解码后的元数据值的 Promise，如果不存在则为 null。
    */
   async getMeta(key) {
-    return this.lsGet(STORE_META, key);
+    return this.lsGet(STORE_META$1, key);
   }
 
   /**
@@ -2299,8 +2244,271 @@ class LogStore extends LogStorageBase {
    * @returns {Promise<Record<string, string|number>>} 解析为所有元数据记录数组的 Promise。
    */
   async getAllMeta() {
-    return this.lsGetAll(STORE_META);
+    return this.lsGetAll(STORE_META$1);
   }
+}
+
+/**
+ * Web Storage 形态的内存实现（无 localStorage 等持久化层时使用）。
+ * @returns {{ setItem(key: string, value: string): void, getItem(key: string): string | null }}
+ */
+
+/** FNV-1a 64-bit：offset basis */
+const FNV1A_64_OFFSET = 14695981039346656037n;
+/** FNV-1a 64-bit：prime */
+const FNV1A_64_PRIME = 1099511628211n;
+const FNV1A_64_MASK = 0xffffffffffffffffn;
+
+/**
+ * UTF-8 字节序列；优先用全局 `TextEncoder`（浏览器 / 现代 Node / RN），否则纯 JS 回退（如旧 Node 无全局 TextEncoder）。
+ * @param {string} str
+ * @returns {Uint8Array}
+ */
+function utf8Bytes(str) {
+  if (typeof TextEncoder !== "undefined") {
+    return new TextEncoder().encode(str);
+  }
+  const out = [];
+  for (let i = 0; i < str.length; i++) {
+    let c = str.charCodeAt(i);
+    if (c < 0x80) {
+      out.push(c);
+    } else if (c < 0x800) {
+      out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    } else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+      const c2 = str.charCodeAt(i + 1);
+      if (c2 >= 0xdc00 && c2 <= 0xdfff) {
+        const cp = 0x10000 + ((c & 0x3ff) << 10) + (c2 & 0x3ff);
+        i++;
+        out.push(
+          0xf0 | (cp >> 18),
+          0x80 | ((cp >> 12) & 0x3f),
+          0x80 | ((cp >> 6) & 0x3f),
+          0x80 | (cp & 0x3f)
+        );
+      } else {
+        out.push(0xef, 0xbf, 0xbd);
+      }
+    } else if (c >= 0xdc00 && c <= 0xdfff) {
+      out.push(0xef, 0xbf, 0xbd);
+    } else {
+      out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+    }
+  }
+  return new Uint8Array(out);
+}
+
+/**
+ * 为日志正文生成去重键（FNV-1a 64-bit，输入按 UTF-8 字节计算）。
+ * 同步、轻量，不依赖 crypto.subtle；需运行环境支持 **BigInt**（Node 10+、现代浏览器与 Hermes）。
+ * 非密码学强度，仅用于短时间窗内的内容去重。
+ * @param {string} str
+ * @returns {string} 固定 16 位十六进制小写字符串
+ */
+function dedupContentKey(str) {
+  const bytes = utf8Bytes(str);
+  let h = FNV1A_64_OFFSET;
+  for (let i = 0; i < bytes.length; i++) {
+    h ^= BigInt(bytes[i]);
+    h = (h * FNV1A_64_PRIME) & FNV1A_64_MASK;
+  }
+  return h.toString(16).padStart(16, "0");
+}
+
+/**
+ * 判断两个时间戳是否为同一天
+ * @param {number} ts1 毫秒级时间戳
+ * @param {number} ts2 毫秒级时间戳
+ * @returns {boolean}
+ */
+function isSameDay(ts1, ts2) {
+  const d1 = new Date(Number(ts1));
+  const d2 = new Date(Number(ts2));
+  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+}
+
+/**
+ * 请求公网IP和地区（使用 geojs）
+ * @returns {Promise<{ip?: string, region?: string}>}
+ */
+async function fetchPublicIPAndRegion() {
+  try {
+    const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
+    if (!res.ok) return {};
+    const data = await res.json();
+    const ip = data.ip;
+    const region = data.country;
+    return { ip, region };
+  } catch (e) {
+    return {};
+  }
+}
+
+// 默认的数组采样规则
+const ARRAY_SAMPLING_CONFIG = {
+  primitive: {
+    threshold: 20, // 对简单数组保持宽松的阈值
+    head: 10,      // 保留足够的上下文
+    tail: 4,
+    middle: 3
+  },
+  complex: {
+    threshold: 10, // 对复杂数组使用严格的阈值
+    head: 5,       // 采用更保守的采样数
+    tail: 3,
+    middle: 2
+  },
+};
+
+/** 无浏览器特化时的空处理器表；直接调用 core 导出时请使用 `.call(defaultTypeHandlers, …)` 或与 web 包一样 `.bind(handlers)` */
+const defaultTypeHandlers = new Map();
+
+/**
+ * 递归地将值转换为可 JSON 序列化的格式。
+ * @param {any} value - 需要序列化的值。
+ * @param {object} [options={maxDepth: 10, sensitiveKeys: [...]}] - 序列化选项。
+ * @param {number} [options.maxDepth=10] - 最大序列化深度。
+ * @param {string[]} [options.sensitiveKeys=['password', 'token', 'secret', 'auth']] - 敏感信息的键名。
+ * @param {number} [currentDepth=0] - 当前序列化深度，用于递归。
+ * @param {WeakSet} [seen=new WeakSet()] - 用于检测循环引用的集合，用于递归。
+ * @returns {any} 可序列化的值。
+ */
+function serializeSingleValue(
+  value,
+  options = {
+    maxDepth: 10,
+    sensitiveKeys: ['password', 'token', 'secret', 'auth'],
+  },
+  currentDepth = 0,
+  seen = new WeakSet(),
+) {
+  const { maxDepth, sensitiveKeys } = options;
+  const type = typeof value;
+
+  // 处理原始类型和 null
+  if (value === null || ['string', 'number', 'boolean', 'undefined'].includes(type)) {
+    return value;
+  }
+
+  // 处理 BigInt
+  if (type === 'bigint') {
+    return `${value.toString()}n`;
+  }
+
+  // 处理 Symbol
+  if (type === 'symbol') {
+    return value.toString();
+  }
+  
+  // 处理函数
+  if (type === 'function') {
+    return `[Function: ${value.name || 'anonymous'}]`;
+  }
+
+  // --- 对象类型处理开始 ---
+
+  // 检查循环引用
+  if (typeof value === 'object') {
+    if (seen.has(value)) {
+      return '[循环引用]';
+    }
+    seen.add(value);
+  }
+
+  // 检查最大深度
+  if (currentDepth >= maxDepth) {
+    return `[达到最大深度: ${Object.prototype.toString.call(value)}]`;
+  }
+
+  // 处理特殊对象类型
+  // 检查是否有专门的类型处理器（策略模式）
+  for (const [typeConstructor, handler] of this.entries()) {
+    if (value instanceof typeConstructor) {
+      return handler(value, options, currentDepth, seen);
+    }
+  }
+
+  if (value instanceof Error) {
+    return `${value.name}: ${value.message}\nStack: ${value.stack || ''}`;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (value instanceof RegExp) {
+    return value.toString();
+  }
+  if (typeof Map !== 'undefined' && value instanceof Map) {
+    const obj = {};
+    for (const [k, v] of value.entries()) {
+      const keyStr = typeof k === 'object' && k !== null ? '[object]' : String(k);
+      obj[keyStr] = serializeSingleValue.call(this, v, options, currentDepth + 1, seen);
+    }
+    return obj;
+  }
+  if (typeof Set !== 'undefined' && value instanceof Set) {
+    const arr = [];
+    for (const v of value.values()) {
+      arr.push(serializeSingleValue.call(this, v, options, currentDepth + 1, seen));
+    }
+    return arr;
+  }
+
+  // 处理数组 (包括采样逻辑)
+  if (Array.isArray(value)) {
+    const isComplex = value.length > 0 && typeof value[0] === 'object' && value[0] !== null;
+    const rules = isComplex ? ARRAY_SAMPLING_CONFIG.complex : ARRAY_SAMPLING_CONFIG.primitive;
+
+    // 卫语句：如果未达到采样阈值，则正常处理并提前返回
+    if (value.length <= rules.threshold) {
+      return value.map(item => serializeSingleValue.call(this, item, options, currentDepth + 1, seen));
+    }
+
+    // --- 采样逻辑开始 ---
+    const sampledResult = { _t: 'arr', _l: value.length, _e: {} };
+    const indices = new Set();
+
+    // Head
+    for (let i = 0; i < rules.head && i < value.length; i++) {
+      indices.add(i);
+    }
+    // Tail
+    for (let i = 0; i < rules.tail && value.length - 1 - i >= 0; i++) {
+      indices.add(value.length - 1 - i);
+    }
+    // Middle
+    const midStart = Math.floor(value.length / 2 - rules.middle / 2);
+    for (let i = 0; i < rules.middle && midStart + i < value.length; i++) {
+      indices.add(midStart + i);
+    }
+
+    const sortedIndices = Array.from(indices).sort((a, b) => a - b);
+    for (const index of sortedIndices) {
+      sampledResult._e[index] = serializeSingleValue.call(this, value[index], options, currentDepth + 1, seen);
+    }
+
+    return sampledResult;
+  }
+
+  // 处理普通对象
+  if (typeof value === 'object' && value !== null) {
+     // 检查是否有自定义的 toJSON 方法
+    if (typeof value.toJSON === 'function') {
+      return serializeSingleValue.call(this, value.toJSON(), options, currentDepth + 1, seen);
+    }
+
+    const result = {};
+    for (const key of Object.keys(value)) {
+      if (sensitiveKeys.includes(key.toLowerCase())) {
+        result[key] = '[敏感信息已过滤]';
+      } else {
+        result[key] = serializeSingleValue.call(this, value[key], options, currentDepth + 1, seen);
+      }
+    }
+    return result;
+  }
+
+  // 兜底处理
+  return String(value);
 }
 
 /**
@@ -2491,6 +2699,7 @@ let LogProcessor$1 = class LogProcessor extends LogStore {
   async insertLog(logItem) {
     if (!logItem.content) return null;
     let log = await this.dedupLog(logItem);
+    console.log('添加日志', log);
     if (!log) return null;
     log = await this.completeLog(log);
     const {size = 0} = await super.insertLog(log);
@@ -2522,7 +2731,7 @@ let LogProcessor$1 = class LogProcessor extends LogStore {
     const { ip, region, extendedMeta } = await this._getMeta();
     logItem.ip = ip;
     logItem.region = region;
-    logItem.extendedMeta = serializeSingleValue$1.call(defaultTypeHandlers, extendedMeta);
+    logItem.extendedMeta = serializeSingleValue.call(defaultTypeHandlers, extendedMeta);
     return logItem;
   }
 };
@@ -3650,15 +3859,13 @@ function writeUtf8(buf, str, pos) {
 
 
 function readLogItem(pbf, end) {
-    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", userAgent: "", screen: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
+    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
 }
 function readLogItemField(tag, obj, pbf) {
     if (tag === 1) obj.time = pbf.readVarint(true);
     else if (tag === 2) obj.level = pbf.readString();
     else if (tag === 3) obj.content = pbf.readString();
     else if (tag === 4) obj.clientUuid = pbf.readString();
-    else if (tag === 5) obj.userAgent = pbf.readString();
-    else if (tag === 6) obj.screen = pbf.readString();
     else if (tag === 7) obj.window = pbf.readString();
     else if (tag === 8) obj.url = pbf.readString();
     else if (tag === 9) obj.ip = pbf.readString();
@@ -3673,8 +3880,6 @@ function writeLogItem(obj, pbf) {
     if (obj.level) pbf.writeStringField(2, obj.level);
     if (obj.content) pbf.writeStringField(3, obj.content);
     if (obj.clientUuid) pbf.writeStringField(4, obj.clientUuid);
-    if (obj.userAgent) pbf.writeStringField(5, obj.userAgent);
-    if (obj.screen) pbf.writeStringField(6, obj.screen);
     if (obj.window) pbf.writeStringField(7, obj.window);
     if (obj.url) pbf.writeStringField(8, obj.url);
     if (obj.ip) pbf.writeStringField(9, obj.ip);
@@ -3708,6 +3913,28 @@ function writeLogItem_FieldEntry14(obj, pbf) {
     if (obj.key) pbf.writeStringField(1, obj.key);
     if (obj.value) pbf.writeStringField(2, obj.value);
 }
+
+/**
+ * 日志持久化抽象基类：约定与 `idb` 的 `IDBPDatabase` 相近的 CRUD 形态，
+ * 由具体环境子类（如 Web IndexedDB）实现。
+ *
+ * 持久化相关钩子统一使用 **`ls` 前缀**（log storage），降低与中间层、
+ * 业务子类方法名（如 `add` / `get`）冲突、误覆盖的风险。
+ *
+ * 各 `ls*` 方法第一个参数均为对象仓库名（store name），与 `LogStore` 中
+ * `b_dat` / `digestCache` / `meta` 等常量对应；`lsDeleteMany` 按条件批量删除（如按 `timestamp`）；
+ * `lsGetStoreSize` 用游标累加各条 value 的负载字节数（非引擎磁盘占用）。
+ * `lsInit` 仅做参数校验；连接打开、upgrade 与状态字段由**平台层**实现。
+ */
+
+
+const DB_NAME = 'beacon-db';
+const DB_VERSION = 1;
+
+// 定义对象存储区的名称
+const STORE_LOGS = 'b_dat';
+const STORE_DIGEST = 'digestCache';
+const STORE_META = 'meta';
 
 const MixinLogStore = (BaseClass) => {
   /**
@@ -3814,7 +4041,7 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Uint8Array} 编码后的二进制数据。
      */
     _encode(data) {
-      return utf8Bytes(data);
+      return utf8Bytes$1(data);
     }
 
     /**
@@ -3836,6 +4063,7 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Promise<number>} 解析为新日志记录ID的 Promise。
      */
     async lsAdd(storeName, value) {
+      console.log("indexeddb add", storeName, value);
       const db = await this._getDB();
       if (storeName === STORE_LOGS) {
         value = this.encodeLog(value);
@@ -3972,7 +4200,7 @@ const generateLog = () => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       const logProcessor = new LogProcessor();
       const uaSerialized = JSON.stringify(
-        serializeSingleValue(UAParser(navigator.userAgent))
+        serializeSingleValue$1(UAParser(navigator.userAgent))
       );
       const screenSerialized = JSON.stringify({
         width: window.screen.width,
@@ -4179,8 +4407,5 @@ const generateLog = () => {
   }
 };
 
-// 使用自执行函数，将依赖作为参数传入
-(function() {
-  // 在 document 就绪时执行的函数
-  generateLog();
-})();
+/** 作为 `<script type="module">` 入口加载时立即初始化（与原先 sls/loki/beacon.js 行为一致）。 */
+generateLog();

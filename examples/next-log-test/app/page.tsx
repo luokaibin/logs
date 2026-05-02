@@ -59,12 +59,13 @@ export default function Home() {
           在仓库根目录执行：<code>pnpm install</code>
         </li>
         <li>
-          构建 beacon：<code>pnpm --filter logbeacon build</code>，再{' '}
-          <code>pnpm --filter next-log-test sync-beacon</code>（或 <code>pnpm --filter next-log-test dev</code>
-          自带的 predev）
+          根目录 <code>pnpm run build</code> 一次（或 <code>pnpm run dev</code> 让 core/web
+          的 watch 先产出 dist）；示例的 <code>dev</code> 会监视 web 的{' '}
+          <code>dist/sls</code> 并自动 <code>sync-beacon</code>。
         </li>
         <li>
-          启动本示例：<code>pnpm --filter next-log-test dev</code>，浏览器访问{' '}
+          全栈联调可根目录 <code>pnpm run dev</code>；只跑示例时{' '}
+          <code>pnpm --filter next-log-test dev</code>，浏览器访问{' '}
           <a href="http://localhost:3100">http://localhost:3100</a>
         </li>
       </ol>

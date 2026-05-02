@@ -1,0 +1,2 @@
+export { localStorage } from "./localStorage";
+
