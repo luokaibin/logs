@@ -46,6 +46,11 @@ export interface EnhancedLogger {
 /** 默认日志实例在全局对象上的属性名（与 `packages/web/core/logs.js` 中一致） */
 export declare const LOG_BEACON_GLOBAL_KEY: string;
 
+/**
+ * 指定日志上报接口地址（与 Web `data-beacon-url` / `config-update` 对齐）。
+ */
+export declare function setBeaconUrl(beaconUrl: string): Promise<void>;
+
 declare const log: EnhancedLogger;
 
 export default log;

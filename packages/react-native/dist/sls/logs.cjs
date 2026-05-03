@@ -1,3 +1,618 @@
+'use strict';
+
+Object.defineProperty(exports, '__esModule', { value: true });
+
+var reactNative = require('react-native');
+var reactNativeQuickSqlite = require('react-native-quick-sqlite');
+
+/** 与历史 loglevel 数值一致，便于兼容 localStorage */
+const LEVELS = Object.freeze({
+  TRACE: 0,
+  DEBUG: 1,
+  INFO: 2,
+  WARN: 3,
+  ERROR: 4,
+  SILENT: 5,
+});
+
+const LEVEL_NAMES = ["trace", "log", "info", "warn", "error", "silent"];
+
+const DEFAULT_LEVEL_KEY = "loglevel";
+const DEFAULT_KEYWORDS_KEY = "_logFilterKeyWords";
+
+/**
+ * 基于 console 的分级日志；level / 关键词的持久化通过外部传入的 storage 完成。
+ *
+ * @typedef {{ setItem(key: string, value: string): void, getItem(key: string): string | null }} LogStorage
+ */
+class ConsoleLogger {
+  static LEVELS = LEVELS;
+  static DEFAULT_LEVEL_KEY = DEFAULT_LEVEL_KEY;
+  static DEFAULT_KEYWORDS_KEY = DEFAULT_KEYWORDS_KEY;
+
+  /**
+   * @param {{
+   *   storage: LogStorage,
+   *   forwardLog?: (level: string, args: unknown[]) => void,
+   * }} options
+   */
+  constructor(options) {
+    if (!options || typeof options !== "object") {
+      throw new TypeError("ConsoleLogger requires an options object");
+    }
+    const { storage, forwardLog } = options;
+    if (!storage || typeof storage !== "object") {
+      throw new TypeError("ConsoleLogger requires options.storage");
+    }
+    if (typeof storage.setItem !== "function" || typeof storage.getItem !== "function") {
+      throw new TypeError(
+        "storage must implement setItem(key: string, value: string) and getItem(key: string)"
+      );
+    }
+    /** @type {LogStorage} */
+    this._storage = storage;
+    this._forwardLog = typeof forwardLog === "function" ? forwardLog : null;
+    this._boundConsole = this._createBoundConsoleMap();
+    this._noop = () => {};
+
+    this.trace = this._noop;
+    this.debug = this._noop;
+    this.info = this._noop;
+    this.warn = this._noop;
+    this.error = this._noop;
+    this._rebuildMethods();
+  }
+
+  _getLevel() {
+    if (typeof this._currentLevel === "number" && this._currentLevel >= 0 && this._currentLevel <= LEVELS.SILENT) {
+      return this._currentLevel;
+    }
+    const raw = this._storage.getItem(ConsoleLogger.DEFAULT_LEVEL_KEY);
+    if (raw == null || String(raw).trim() === "") {
+      this._currentLevel = LEVELS.WARN;
+      return this._currentLevel;
+    }
+    const n = Number(String(raw).trim());
+    if (
+      !Number.isInteger(n) ||
+      n < LEVELS.TRACE ||
+      n > LEVELS.SILENT
+    ) {
+      this._currentLevel = LEVELS.WARN;
+      return this._currentLevel;
+    }
+    this._currentLevel = n;
+    return this._currentLevel;
+  }
+
+  /**
+   * @param {"TRACE"|"DEBUG"|"INFO"|"WARN"|"ERROR"|"SILENT"} level
+   */
+  setLevel(level) {
+    if(LEVELS[level] === undefined) return;
+    this._currentLevel = LEVELS[level];
+    this._storage.setItem(ConsoleLogger.DEFAULT_LEVEL_KEY, this._currentLevel);
+    this._rebuildMethods();
+  }
+
+  setKeyWords(keyWords) {
+    if (typeof keyWords !== "string") return;
+    this._keywords = keyWords;
+    this._storage.setItem(ConsoleLogger.DEFAULT_KEYWORDS_KEY, this._keywords);
+  }
+
+  getKeyWords() {
+    if (typeof this._keywords === "string") return this._keywords;
+    this._keywords = this._storage.getItem(ConsoleLogger.DEFAULT_KEYWORDS_KEY);
+    return this._keywords;
+  }
+
+  _shouldLog(methodName) {
+    const idx = LEVEL_NAMES.indexOf(methodName);
+    if (idx === -1) return true;
+    return idx >= this._getLevel();
+  }
+
+  _createBoundConsoleMap() {
+    const c = typeof console !== "undefined" ? console : null;
+    if (!c) {
+      return Object.freeze({
+        trace: null,
+        log: null,
+        info: null,
+        warn: null,
+        error: null,
+      });
+    }
+    const bind = (name, fallbackName) => {
+      const candidate = c[name] || c[fallbackName];
+      return typeof candidate === "function" ? candidate.bind(c) : null;
+    };
+    return Object.freeze({
+      trace: bind("trace", "log"),
+      log: bind("debug", "log"),
+      info: bind("info", "log"),
+      warn: bind("warn", "log"),
+      error: bind("error", "log"),
+    });
+  }
+
+  _rebuildMethods() {
+    this.trace = this._shouldLog("trace") ? (...args) => this._emit("trace", args) : this._noop;
+    this.debug = this._shouldLog("log") ? (...args) => this._emit("log", args) : this._noop;
+    this.info = this._shouldLog("info") ? (...args) => this._emit("info", args) : this._noop;
+    this.warn = this._shouldLog("warn") ? (...args) => this._emit("warn", args) : this._noop;
+    this.error = this._shouldLog("error") ? (...args) => this._emit("error", args) : this._noop;
+  }
+
+  /**
+   * @param {"trace"|"debug"|"info"|"warn"|"error"} fnName
+   * @param {unknown[]} args
+   */
+  _emit(fnName, args) {
+    const bound = this._boundConsole[fnName];
+    if (typeof bound !== "function") return;
+    if (this._forwardLog) {
+      this._forwardLog(fnName === "log" ? "debug" : fnName, args);
+    }
+    if (typeof args[0] !== "string") {
+      bound(...args);
+      return;
+    }
+    const keyWords = this.getKeyWords();
+    if (!keyWords) {
+      bound(...args);
+      return;
+    }
+    if (!String(args[0]).startsWith(keyWords)) return;
+    bound(...args);
+  }
+}
+
+/**
+ * Web Storage 形态的内存实现（无 localStorage 等持久化层时使用）。
+ * @returns {{ setItem(key: string, value: string): void, getItem(key: string): string | null }}
+ */
+function createMemoryStorage() {
+  const map = new Map();
+  return {
+    setItem(key, value) {
+      map.set(key, String(value));
+    },
+    getItem(key) {
+      return map.has(key) ? map.get(key) : null;
+    },
+  };
+}
+
+/**
+ * 生成随机前缀字符串（16位大写十六进制）
+ * @returns {string}
+ */
+function generateRandomPrefix$1() {
+  let uuid;
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    uuid = crypto.randomUUID();
+  } else {
+    // 生成 16 字节的随机十六进制字符串
+    const hexChars = '0123456789ABCDEF';
+    uuid = '';
+    for (let i = 0; i < 32; i++) {
+      uuid += hexChars[Math.floor(Math.random() * 16)];
+    }
+  }
+  return uuid.replace(/-/g, '').toUpperCase().substring(0, 16);
+}
+
+/**
+ * 生成标准 UUID v4（RFC 4122）。
+ * 优先使用 Web Crypto 的 getRandomValues（CSPRNG）；不可用时退回 Math.random（非密码学强度）。
+ * @returns {string} 如 xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+ */
+function generateUUIDv4() {
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+/**
+ * 获取或创建客户端唯一 ID（键名 `_client_uuid`），并写入存储。
+ * 必须通过外部绑定 `this` 调用（例如 `getOrCreateUUID.call(localStorage)` 或先 `bind`），
+ * 要求 `this` 提供与 Web Storage 一致的方法：`getItem(key)`、`setItem(key, value)`。
+ * 应绑定**持久化**存储（如 `localStorage`、RN 侧的 AsyncStorage/MMKV 适配对象），以便安装期内多次启动仍复用同一 UUID。
+ * @this {{ getItem: (key: string) => string | null, setItem: (key: string, value: string) => void }}
+ * @returns {string}
+ */
+function getOrCreateUUID() {
+  const key = "_client_uuid";
+  let uuid = this.getItem(key);
+  if (!uuid) {
+    uuid = generateUUIDv4();
+    this.setItem(key, uuid);
+  }
+  return uuid;
+}
+
+/**
+ * 获取或创建会话级 sessionId（键名 `_session_id`），并写入存储。
+ * 同样须绑定 `this` 为带 `getItem` / `setItem` 的对象（API 形态同 Web Storage）。
+ * 应绑定**会话**存储（如 `sessionStorage`，或仅进程/内存生命周期、冷启动即清空的适配对象），
+ * 与持久化 UUID 区分：用于标识「本次启动/本次会话」内的操作。
+ * @this {{ getItem: (key: string) => string | null, setItem: (key: string, value: string) => void }}
+ * @returns {string}
+ */
+function getOrCreateSessionId() {
+  const key = "_session_id";
+  let sessionId = this.getItem(key);
+  if (!sessionId) {
+    sessionId = generateRandomPrefix$1();
+    this.setItem(key, sessionId);
+  }
+  return sessionId;
+}
+
+
+function getGlobalObject() {
+  if (typeof globalThis !== "undefined") return globalThis;
+  if (typeof global !== "undefined") return global;
+  if (typeof self !== "undefined") return self;
+  return undefined;
+}
+
+/**
+ * 跨平台日志附加信息（由本文件的 getLogExtraInfo 产生）
+ * @typedef {Object} LogExtraInfo
+ * @property {number} time - 日志生成的时间戳（毫秒级）
+ * @property {Object.<string, string>} extendedAttributes - 来自全局 `LOGS_CONTEXT` 的字符串键值（已过滤空串）
+ */
+
+/**
+ * @returns {LogExtraInfo|{}} 若无法取得全局对象则返回空对象；否则返回时间与扩展属性
+ * @description 读取全局对象上的 `LOGS_CONTEXT`（若存在），与当前时间一并作为附加信息
+ */
+function getLogExtraInfo$1() {
+  const g = getGlobalObject();
+  if (!g) return {};
+  // 过滤扩展属性，只保留有效的字符串值
+  const extendedAttributes = {};
+  if (g.LOGS_CONTEXT && typeof g.LOGS_CONTEXT === 'object') {
+    for (const [key, value] of Object.entries(g.LOGS_CONTEXT)) {
+      if (typeof value === 'string' && value.trim().length > 0) {
+        extendedAttributes[key] = value;
+      }
+    }
+  }
+
+  const base = {
+    time: Date.now(),
+    extendedAttributes,
+  };
+  return base;
+}
+
+// 默认的数组采样规则
+const ARRAY_SAMPLING_CONFIG$1 = {
+  primitive: {
+    threshold: 20, // 对简单数组保持宽松的阈值
+    head: 10,      // 保留足够的上下文
+    tail: 4,
+    middle: 3
+  },
+  complex: {
+    threshold: 10, // 对复杂数组使用严格的阈值
+    head: 5,       // 采用更保守的采样数
+    tail: 3,
+    middle: 2
+  },
+};
+
+// 序列化后日志字符串的最大长度
+const MAX_LOG_LENGTH = 100000;
+
+/** 无浏览器特化时的空处理器表；直接调用 core 导出时请使用 `.call(defaultTypeHandlers, …)` 或与 web 包一样 `.bind(handlers)` */
+const defaultTypeHandlers$1 = new Map();
+
+/**
+ * 递归地将值转换为可 JSON 序列化的格式。
+ * @param {any} value - 需要序列化的值。
+ * @param {object} [options={maxDepth: 10, sensitiveKeys: [...]}] - 序列化选项。
+ * @param {number} [options.maxDepth=10] - 最大序列化深度。
+ * @param {string[]} [options.sensitiveKeys=['password', 'token', 'secret', 'auth']] - 敏感信息的键名。
+ * @param {number} [currentDepth=0] - 当前序列化深度，用于递归。
+ * @param {WeakSet} [seen=new WeakSet()] - 用于检测循环引用的集合，用于递归。
+ * @returns {any} 可序列化的值。
+ */
+function serializeSingleValue$2(
+  value,
+  options = {
+    maxDepth: 10,
+    sensitiveKeys: ['password', 'token', 'secret', 'auth'],
+  },
+  currentDepth = 0,
+  seen = new WeakSet(),
+) {
+  const { maxDepth, sensitiveKeys } = options;
+  const type = typeof value;
+
+  // 处理原始类型和 null
+  if (value === null || ['string', 'number', 'boolean', 'undefined'].includes(type)) {
+    return value;
+  }
+
+  // 处理 BigInt
+  if (type === 'bigint') {
+    return `${value.toString()}n`;
+  }
+
+  // 处理 Symbol
+  if (type === 'symbol') {
+    return value.toString();
+  }
+  
+  // 处理函数
+  if (type === 'function') {
+    return `[Function: ${value.name || 'anonymous'}]`;
+  }
+
+  // --- 对象类型处理开始 ---
+
+  // 检查循环引用
+  if (typeof value === 'object') {
+    if (seen.has(value)) {
+      return '[循环引用]';
+    }
+    seen.add(value);
+  }
+
+  // 检查最大深度
+  if (currentDepth >= maxDepth) {
+    return `[达到最大深度: ${Object.prototype.toString.call(value)}]`;
+  }
+
+  // 处理特殊对象类型
+  // 检查是否有专门的类型处理器（策略模式）
+  for (const [typeConstructor, handler] of this.entries()) {
+    if (value instanceof typeConstructor) {
+      return handler(value, options, currentDepth, seen);
+    }
+  }
+
+  if (value instanceof Error) {
+    return `${value.name}: ${value.message}\nStack: ${value.stack || ''}`;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (value instanceof RegExp) {
+    return value.toString();
+  }
+  if (typeof Map !== 'undefined' && value instanceof Map) {
+    const obj = {};
+    for (const [k, v] of value.entries()) {
+      const keyStr = typeof k === 'object' && k !== null ? '[object]' : String(k);
+      obj[keyStr] = serializeSingleValue$2.call(this, v, options, currentDepth + 1, seen);
+    }
+    return obj;
+  }
+  if (typeof Set !== 'undefined' && value instanceof Set) {
+    const arr = [];
+    for (const v of value.values()) {
+      arr.push(serializeSingleValue$2.call(this, v, options, currentDepth + 1, seen));
+    }
+    return arr;
+  }
+
+  // 处理数组 (包括采样逻辑)
+  if (Array.isArray(value)) {
+    const isComplex = value.length > 0 && typeof value[0] === 'object' && value[0] !== null;
+    const rules = isComplex ? ARRAY_SAMPLING_CONFIG$1.complex : ARRAY_SAMPLING_CONFIG$1.primitive;
+
+    // 卫语句：如果未达到采样阈值，则正常处理并提前返回
+    if (value.length <= rules.threshold) {
+      return value.map(item => serializeSingleValue$2.call(this, item, options, currentDepth + 1, seen));
+    }
+
+    // --- 采样逻辑开始 ---
+    const sampledResult = { _t: 'arr', _l: value.length, _e: {} };
+    const indices = new Set();
+
+    // Head
+    for (let i = 0; i < rules.head && i < value.length; i++) {
+      indices.add(i);
+    }
+    // Tail
+    for (let i = 0; i < rules.tail && value.length - 1 - i >= 0; i++) {
+      indices.add(value.length - 1 - i);
+    }
+    // Middle
+    const midStart = Math.floor(value.length / 2 - rules.middle / 2);
+    for (let i = 0; i < rules.middle && midStart + i < value.length; i++) {
+      indices.add(midStart + i);
+    }
+
+    const sortedIndices = Array.from(indices).sort((a, b) => a - b);
+    for (const index of sortedIndices) {
+      sampledResult._e[index] = serializeSingleValue$2.call(this, value[index], options, currentDepth + 1, seen);
+    }
+
+    return sampledResult;
+  }
+
+  // 处理普通对象
+  if (typeof value === 'object' && value !== null) {
+     // 检查是否有自定义的 toJSON 方法
+    if (typeof value.toJSON === 'function') {
+      return serializeSingleValue$2.call(this, value.toJSON(), options, currentDepth + 1, seen);
+    }
+
+    const result = {};
+    for (const key of Object.keys(value)) {
+      if (sensitiveKeys.includes(key.toLowerCase())) {
+        result[key] = '[敏感信息已过滤]';
+      } else {
+        result[key] = serializeSingleValue$2.call(this, value[key], options, currentDepth + 1, seen);
+      }
+    }
+    return result;
+  }
+
+  // 兜底处理
+  return String(value);
+}
+
+/**
+ * 将任何 JavaScript 内容序列化为截断后的 JSON 字符串。
+ * @param {any} content - 需要序列化的内容。
+ * @returns {string} 序列化后的 JSON 字符串。
+ */
+function serializeLogContent$1(content) {
+  const serializableObject = serializeSingleValue$2.call(this, content);
+
+  try {
+    const result = JSON.stringify(serializableObject);
+
+    // 截断过长的结果
+    return result.length > MAX_LOG_LENGTH ? result.slice(0, MAX_LOG_LENGTH) + '...' : result;
+  } catch (e) {
+    // Fallback for any unexpected stringify errors
+    return `[序列化失败: ${e.message}]`;
+  }
+}
+
+const serializeSingleValue$1 = serializeSingleValue$2.bind(defaultTypeHandlers$1);
+const serializeLogContent = serializeLogContent$1.bind(defaultTypeHandlers$1);
+
+class Database {
+  static _instance = null;
+  static DB_NAME = "beacon-db";
+  static getInstance() {
+    if (!this._instance) {
+      const db = reactNativeQuickSqlite.open({ name: Database.DB_NAME });
+      db.execute("PRAGMA journal_mode = WAL;");
+      db.execute("PRAGMA synchronous = NORMAL;");
+      db.execute("PRAGMA temp_store = MEMORY;");
+      this._instance = db;
+    }
+    return this._instance;
+  }
+}
+
+const DB = Database.getInstance();
+
+function assertValidKey(key) {
+  if (typeof key !== "string" || key.trim().length === 0) {
+    throw new TypeError("localStorage key must be a non-empty string");
+  }
+}
+
+function assertValidValue(value) {
+  if (typeof value !== "string") {
+    throw new TypeError("localStorage value must be a string");
+  }
+}
+
+function getFirstRow(result) {
+  if (!result?.rows) return null;
+  if (Array.isArray(result.rows)) return result.rows[0] ?? null;
+  if (Array.isArray(result.rows._array)) return result.rows._array[0] ?? null;
+  if (typeof result.rows.item === "function" && result.rows.length > 0) {
+    return result.rows.item(0);
+  }
+  return null;
+}
+
+class LocalStorage {
+  /** @type {LocalStorage | null} */
+  static _instance = null;
+  /** @type {string} */
+  static TABLE_NAME = "localStorage";
+  constructor() {
+    DB.execute(`
+      CREATE TABLE IF NOT EXISTS ${LocalStorage.TABLE_NAME} (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      ) WITHOUT ROWID;
+    `);
+  }
+
+  /**
+   * @param {string} key
+   * @param {string} value
+   */
+  setItem(key, value) {
+    assertValidKey(key);
+    assertValidValue(value);
+    DB.execute(
+      `
+      INSERT INTO ${LocalStorage.TABLE_NAME}(key, value, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updated_at = excluded.updated_at;
+      `,
+      [key, value, Date.now()]
+    );
+  }
+
+  /**
+   * @param {string} key
+   * @returns {string | null}
+   */
+  getItem(key) {
+    assertValidKey(key);
+    const result = DB.execute(`SELECT value FROM ${LocalStorage.TABLE_NAME} WHERE key = ? LIMIT 1;`, [key]);
+    const row = getFirstRow(result);
+    return row ? row.value : null;
+  }
+
+  /**
+   * 获取全部键值对，返回对象形式：{ [key]: value }
+   * @returns {Record<string, string>}
+   */
+  getAll() {
+    const result = DB.execute(`SELECT key, value FROM ${LocalStorage.TABLE_NAME};`);
+    const rows = Array.isArray(result?.rows) ? result.rows : (result?.rows?._array || []);
+    const all = Object.create(null);
+    for (const row of rows) {
+      if (row && typeof row.key === "string" && typeof row.value === "string") {
+        all[row.key] = row.value;
+      }
+    }
+    return all;
+  }
+
+  /**
+   * @param {string} key
+   */
+  removeItem(key) {
+    assertValidKey(key);
+    DB.execute(`DELETE FROM ${LocalStorage.TABLE_NAME} WHERE key = ?;`, [key]);
+  }
+
+  clear() {
+    DB.execute(`DELETE FROM ${LocalStorage.TABLE_NAME};`);
+  }
+
+  static getInstance() {
+    if (!this._instance) {
+      this._instance = new LocalStorage();
+    }
+    return this._instance;
+  }
+}
+
+const localStorage = LocalStorage.getInstance();
+
 /**
  * @file 常量定义文件
  */
@@ -6,7 +621,7 @@
  * 预先计算好的元数据键的 SHA-256 哈希值，用于在 IndexedDB 中作为键名，以增强隐私性。
  * @const {Object<string, string>}
  */
-const META_KEYS = {
+const META_KEYS$1 = {
   IP: 'bb9af5d1915da1fbc132ced081325efcd2e63e4804f96890f42e9739677237a4',
   REGION: 'c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6',
   LAST_UPDATE_TIME: '0682cd61a299947aa5324230d6d64eb1eef0a9b612cbdd2c7ca25355fb614201',
@@ -18,7 +633,7 @@ const META_KEYS = {
  * 可作为元数据键持久化的 META_KEYS 哈希值白名单（与 {@link META_KEYS} 的 value 一一对应）。
  * @type {readonly string[]}
  */
-const META_KEYS_WHITELIST = Object.freeze(Object.values(META_KEYS));
+const META_KEYS_WHITELIST = Object.freeze(Object.values(META_KEYS$1));
 
 /**
  * Web Storage 形态的内存实现（无 localStorage 等持久化层时使用）。
@@ -36,7 +651,7 @@ const FNV1A_64_MASK = 0xffffffffffffffffn;
  * @param {string} str
  * @returns {Uint8Array}
  */
-function utf8Bytes$1(str) {
+function utf8Bytes(str) {
   if (typeof TextEncoder !== "undefined") {
     return new TextEncoder().encode(str);
   }
@@ -78,7 +693,7 @@ function utf8Bytes$1(str) {
  * @returns {string} 固定 16 位十六进制小写字符串
  */
 function dedupContentKey(str) {
-  const bytes = utf8Bytes$1(str);
+  const bytes = utf8Bytes(str);
   let h = FNV1A_64_OFFSET;
   for (let i = 0; i < bytes.length; i++) {
     h ^= BigInt(bytes[i]);
@@ -814,8 +1429,8 @@ class LogStorageBase {
   }
 }
 
-const DB_NAME$1 = 'beacon-db';
-const DB_VERSION$1 = 1;
+const DB_NAME = 'beacon-db';
+const DB_VERSION = 1;
 
 // 定义对象存储区的名称
 const STORE_LOGS$1 = 'b_dat';
@@ -830,7 +1445,7 @@ class LogStore extends LogStorageBase {
 
   constructor() {
     super();
-    this.lsInit(DB_NAME$1, DB_VERSION$1, [STORE_LOGS$1, STORE_DIGEST$1, STORE_META$1]);
+    this.lsInit(DB_NAME, DB_VERSION, [STORE_LOGS$1, STORE_DIGEST$1, STORE_META$1]);
   }
 
   // --- 日志 (b_dat) 操作 ---
@@ -1202,12 +1817,12 @@ class LogProcessor extends LogStore {
       };
     }
     const meta = await this.getAllMeta();
-    this._lastUpdateTime = meta[META_KEYS.LAST_UPDATE_TIME];
+    this._lastUpdateTime = meta[META_KEYS$1.LAST_UPDATE_TIME];
     const now = Date.now();
     this.extendedMeta = Object.fromEntries(Object.entries(meta).filter(([key]) => !META_KEYS_WHITELIST.includes(key)));
     if (this._lastUpdateTime && isSameDay(this._lastUpdateTime, now)) {
-      this._currentIp = meta[META_KEYS.IP];
-      this._currentRegion = meta[META_KEYS.REGION];
+      this._currentIp = meta[META_KEYS$1.IP];
+      this._currentRegion = meta[META_KEYS$1.REGION];
       return {
         ip: this._currentIp,
         region: this._currentRegion,
@@ -1221,9 +1836,9 @@ class LogProcessor extends LogStore {
     this._currentRegion = region;
     this._lastUpdateTime = now;
 
-    await this.setMeta(META_KEYS.LAST_UPDATE_TIME, now);
-    await this.setMeta(META_KEYS.IP, this._currentIp);
-    await this.setMeta(META_KEYS.REGION, this._currentRegion);
+    await this.setMeta(META_KEYS$1.LAST_UPDATE_TIME, now);
+    await this.setMeta(META_KEYS$1.IP, this._currentIp);
+    await this.setMeta(META_KEYS$1.REGION, this._currentRegion);
 
     return {
       ip: this._currentIp,
@@ -2305,7 +2920,7 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
     if (this._beaconUrl) {
       return this._beaconUrl;
     }
-    const storedUrl = await this.getMeta(META_KEYS.BEACON_URL);
+    const storedUrl = await this.getMeta(META_KEYS$1.BEACON_URL);
     if (storedUrl) {
       this._beaconUrl = storedUrl;
       return storedUrl;
@@ -2322,7 +2937,7 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
   async _updateBeaconUrl(url) {
     if (!url) return;
     this._beaconUrl = url;
-    await this.applyExtendedMetaIfChanged(META_KEYS.BEACON_URL, url);
+    await this.applyExtendedMetaIfChanged(META_KEYS$1.BEACON_URL, url);
   }
 
   /**
@@ -2337,12 +2952,12 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
     if (logContext && prefix && logGroupId) {
       const newLogGroupId = parseInt(logGroupId, 16) + 1;
       this._logContext = `${prefix}-${newLogGroupId.toString(16).toUpperCase()}`;
-      await this.setMeta(META_KEYS.LOG_CONTEXT, this._logContext);
+      await this.setMeta(META_KEYS$1.LOG_CONTEXT, this._logContext);
       return this._logContext;
     }
     let [dbLogContext, lastUpdateTime] = await Promise.all([
-      this.getMeta(META_KEYS.LOG_CONTEXT),
-      this.getMeta(META_KEYS.LAST_UPDATE_TIME),
+      this.getMeta(META_KEYS$1.LOG_CONTEXT),
+      this.getMeta(META_KEYS$1.LAST_UPDATE_TIME),
     ]);
     prefix = dbLogContext?.split('-')?.[0];
     logGroupId = dbLogContext?.split('-')?.[1];
@@ -2351,14 +2966,14 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
 
       const newLogGroupId = parseInt(logGroupId, 16) + 1;
       this._logContext = `${prefix}-${newLogGroupId.toString(16).toUpperCase()}`;
-      await this.setMeta(META_KEYS.LOG_CONTEXT, this._logContext);
+      await this.setMeta(META_KEYS$1.LOG_CONTEXT, this._logContext);
       return this._logContext;
     }
 
     prefix = generateRandomPrefix();
     logGroupId = 1;
     this._logContext = `${prefix}-${logGroupId.toString(16).toUpperCase()}`;
-    await this.setMeta(META_KEYS.LOG_CONTEXT, this._logContext);
+    await this.setMeta(META_KEYS$1.LOG_CONTEXT, this._logContext);
     return this._logContext;
   }
   /**
@@ -2519,340 +3134,6 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
     }
   }
 };
-
-const instanceOfAny = (object, constructors) => constructors.some((c) => object instanceof c);
-
-let idbProxyableTypes;
-let cursorAdvanceMethods;
-// This is a function to prevent it throwing up in node environments.
-function getIdbProxyableTypes() {
-    return (idbProxyableTypes ||
-        (idbProxyableTypes = [
-            IDBDatabase,
-            IDBObjectStore,
-            IDBIndex,
-            IDBCursor,
-            IDBTransaction,
-        ]));
-}
-// This is a function to prevent it throwing up in node environments.
-function getCursorAdvanceMethods() {
-    return (cursorAdvanceMethods ||
-        (cursorAdvanceMethods = [
-            IDBCursor.prototype.advance,
-            IDBCursor.prototype.continue,
-            IDBCursor.prototype.continuePrimaryKey,
-        ]));
-}
-const transactionDoneMap = new WeakMap();
-const transformCache = new WeakMap();
-const reverseTransformCache = new WeakMap();
-function promisifyRequest(request) {
-    const promise = new Promise((resolve, reject) => {
-        const unlisten = () => {
-            request.removeEventListener('success', success);
-            request.removeEventListener('error', error);
-        };
-        const success = () => {
-            resolve(wrap(request.result));
-            unlisten();
-        };
-        const error = () => {
-            reject(request.error);
-            unlisten();
-        };
-        request.addEventListener('success', success);
-        request.addEventListener('error', error);
-    });
-    // This mapping exists in reverseTransformCache but doesn't exist in transformCache. This
-    // is because we create many promises from a single IDBRequest.
-    reverseTransformCache.set(promise, request);
-    return promise;
-}
-function cacheDonePromiseForTransaction(tx) {
-    // Early bail if we've already created a done promise for this transaction.
-    if (transactionDoneMap.has(tx))
-        return;
-    const done = new Promise((resolve, reject) => {
-        const unlisten = () => {
-            tx.removeEventListener('complete', complete);
-            tx.removeEventListener('error', error);
-            tx.removeEventListener('abort', error);
-        };
-        const complete = () => {
-            resolve();
-            unlisten();
-        };
-        const error = () => {
-            reject(tx.error || new DOMException('AbortError', 'AbortError'));
-            unlisten();
-        };
-        tx.addEventListener('complete', complete);
-        tx.addEventListener('error', error);
-        tx.addEventListener('abort', error);
-    });
-    // Cache it for later retrieval.
-    transactionDoneMap.set(tx, done);
-}
-let idbProxyTraps = {
-    get(target, prop, receiver) {
-        if (target instanceof IDBTransaction) {
-            // Special handling for transaction.done.
-            if (prop === 'done')
-                return transactionDoneMap.get(target);
-            // Make tx.store return the only store in the transaction, or undefined if there are many.
-            if (prop === 'store') {
-                return receiver.objectStoreNames[1]
-                    ? undefined
-                    : receiver.objectStore(receiver.objectStoreNames[0]);
-            }
-        }
-        // Else transform whatever we get back.
-        return wrap(target[prop]);
-    },
-    set(target, prop, value) {
-        target[prop] = value;
-        return true;
-    },
-    has(target, prop) {
-        if (target instanceof IDBTransaction &&
-            (prop === 'done' || prop === 'store')) {
-            return true;
-        }
-        return prop in target;
-    },
-};
-function replaceTraps(callback) {
-    idbProxyTraps = callback(idbProxyTraps);
-}
-function wrapFunction(func) {
-    // Due to expected object equality (which is enforced by the caching in `wrap`), we
-    // only create one new func per func.
-    // Cursor methods are special, as the behaviour is a little more different to standard IDB. In
-    // IDB, you advance the cursor and wait for a new 'success' on the IDBRequest that gave you the
-    // cursor. It's kinda like a promise that can resolve with many values. That doesn't make sense
-    // with real promises, so each advance methods returns a new promise for the cursor object, or
-    // undefined if the end of the cursor has been reached.
-    if (getCursorAdvanceMethods().includes(func)) {
-        return function (...args) {
-            // Calling the original function with the proxy as 'this' causes ILLEGAL INVOCATION, so we use
-            // the original object.
-            func.apply(unwrap(this), args);
-            return wrap(this.request);
-        };
-    }
-    return function (...args) {
-        // Calling the original function with the proxy as 'this' causes ILLEGAL INVOCATION, so we use
-        // the original object.
-        return wrap(func.apply(unwrap(this), args));
-    };
-}
-function transformCachableValue(value) {
-    if (typeof value === 'function')
-        return wrapFunction(value);
-    // This doesn't return, it just creates a 'done' promise for the transaction,
-    // which is later returned for transaction.done (see idbObjectHandler).
-    if (value instanceof IDBTransaction)
-        cacheDonePromiseForTransaction(value);
-    if (instanceOfAny(value, getIdbProxyableTypes()))
-        return new Proxy(value, idbProxyTraps);
-    // Return the same value back if we're not going to transform it.
-    return value;
-}
-function wrap(value) {
-    // We sometimes generate multiple promises from a single IDBRequest (eg when cursoring), because
-    // IDB is weird and a single IDBRequest can yield many responses, so these can't be cached.
-    if (value instanceof IDBRequest)
-        return promisifyRequest(value);
-    // If we've already transformed this value before, reuse the transformed value.
-    // This is faster, but it also provides object equality.
-    if (transformCache.has(value))
-        return transformCache.get(value);
-    const newValue = transformCachableValue(value);
-    // Not all types are transformed.
-    // These may be primitive types, so they can't be WeakMap keys.
-    if (newValue !== value) {
-        transformCache.set(value, newValue);
-        reverseTransformCache.set(newValue, value);
-    }
-    return newValue;
-}
-const unwrap = (value) => reverseTransformCache.get(value);
-
-/**
- * Open a database.
- *
- * @param name Name of the database.
- * @param version Schema version.
- * @param callbacks Additional callbacks.
- */
-function openDB(name, version, { blocked, upgrade, blocking, terminated } = {}) {
-    const request = indexedDB.open(name, version);
-    const openPromise = wrap(request);
-    if (upgrade) {
-        request.addEventListener('upgradeneeded', (event) => {
-            upgrade(wrap(request.result), event.oldVersion, event.newVersion, wrap(request.transaction), event);
-        });
-    }
-    if (blocked) {
-        request.addEventListener('blocked', (event) => blocked(
-        // Casting due to https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/1405
-        event.oldVersion, event.newVersion, event));
-    }
-    openPromise
-        .then((db) => {
-        if (terminated)
-            db.addEventListener('close', () => terminated());
-        if (blocking) {
-            db.addEventListener('versionchange', (event) => blocking(event.oldVersion, event.newVersion, event));
-        }
-    })
-        .catch(() => { });
-    return openPromise;
-}
-
-const readMethods = ['get', 'getKey', 'getAll', 'getAllKeys', 'count'];
-const writeMethods = ['put', 'add', 'delete', 'clear'];
-const cachedMethods = new Map();
-function getMethod(target, prop) {
-    if (!(target instanceof IDBDatabase &&
-        !(prop in target) &&
-        typeof prop === 'string')) {
-        return;
-    }
-    if (cachedMethods.get(prop))
-        return cachedMethods.get(prop);
-    const targetFuncName = prop.replace(/FromIndex$/, '');
-    const useIndex = prop !== targetFuncName;
-    const isWrite = writeMethods.includes(targetFuncName);
-    if (
-    // Bail if the target doesn't exist on the target. Eg, getAll isn't in Edge.
-    !(targetFuncName in (useIndex ? IDBIndex : IDBObjectStore).prototype) ||
-        !(isWrite || readMethods.includes(targetFuncName))) {
-        return;
-    }
-    const method = async function (storeName, ...args) {
-        // isWrite ? 'readwrite' : undefined gzipps better, but fails in Edge :(
-        const tx = this.transaction(storeName, isWrite ? 'readwrite' : 'readonly');
-        let target = tx.store;
-        if (useIndex)
-            target = target.index(args.shift());
-        // Must reject if op rejects.
-        // If it's a write operation, must reject if tx.done rejects.
-        // Must reject with op rejection first.
-        // Must resolve with op value.
-        // Must handle both promises (no unhandled rejections)
-        return (await Promise.all([
-            target[targetFuncName](...args),
-            isWrite && tx.done,
-        ]))[0];
-    };
-    cachedMethods.set(prop, method);
-    return method;
-}
-replaceTraps((oldTraps) => ({
-    ...oldTraps,
-    get: (target, prop, receiver) => getMethod(target, prop) || oldTraps.get(target, prop, receiver),
-    has: (target, prop) => !!getMethod(target, prop) || oldTraps.has(target, prop),
-}));
-
-const advanceMethodProps = ['continue', 'continuePrimaryKey', 'advance'];
-const methodMap = {};
-const advanceResults = new WeakMap();
-const ittrProxiedCursorToOriginalProxy = new WeakMap();
-const cursorIteratorTraps = {
-    get(target, prop) {
-        if (!advanceMethodProps.includes(prop))
-            return target[prop];
-        let cachedFunc = methodMap[prop];
-        if (!cachedFunc) {
-            cachedFunc = methodMap[prop] = function (...args) {
-                advanceResults.set(this, ittrProxiedCursorToOriginalProxy.get(this)[prop](...args));
-            };
-        }
-        return cachedFunc;
-    },
-};
-async function* iterate(...args) {
-    // tslint:disable-next-line:no-this-assignment
-    let cursor = this;
-    if (!(cursor instanceof IDBCursor)) {
-        cursor = await cursor.openCursor(...args);
-    }
-    if (!cursor)
-        return;
-    cursor = cursor;
-    const proxiedCursor = new Proxy(cursor, cursorIteratorTraps);
-    ittrProxiedCursorToOriginalProxy.set(proxiedCursor, cursor);
-    // Map this double-proxy back to the original, so other cursor methods work.
-    reverseTransformCache.set(proxiedCursor, unwrap(cursor));
-    while (cursor) {
-        yield proxiedCursor;
-        // If one of the advancing methods was not called, call continue().
-        cursor = await (advanceResults.get(proxiedCursor) || cursor.continue());
-        advanceResults.delete(proxiedCursor);
-    }
-}
-function isIteratorProp(target, prop) {
-    return ((prop === Symbol.asyncIterator &&
-        instanceOfAny(target, [IDBIndex, IDBObjectStore, IDBCursor])) ||
-        (prop === 'iterate' && instanceOfAny(target, [IDBIndex, IDBObjectStore])));
-}
-replaceTraps((oldTraps) => ({
-    ...oldTraps,
-    get(target, prop, receiver) {
-        if (isIteratorProp(target, prop))
-            return iterate;
-        return oldTraps.get(target, prop, receiver);
-    },
-    has(target, prop) {
-        return isIteratorProp(target, prop) || oldTraps.has(target, prop);
-    },
-}));
-
-/**
- * Web Storage 形态的内存实现（无 localStorage 等持久化层时使用）。
- * @returns {{ setItem(key: string, value: string): void, getItem(key: string): string | null }}
- */
-
-/**
- * UTF-8 字节序列；优先用全局 `TextEncoder`（浏览器 / 现代 Node / RN），否则纯 JS 回退（如旧 Node 无全局 TextEncoder）。
- * @param {string} str
- * @returns {Uint8Array}
- */
-function utf8Bytes(str) {
-  if (typeof TextEncoder !== "undefined") {
-    return new TextEncoder().encode(str);
-  }
-  const out = [];
-  for (let i = 0; i < str.length; i++) {
-    let c = str.charCodeAt(i);
-    if (c < 0x80) {
-      out.push(c);
-    } else if (c < 0x800) {
-      out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
-    } else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
-      const c2 = str.charCodeAt(i + 1);
-      if (c2 >= 0xdc00 && c2 <= 0xdfff) {
-        const cp = 0x10000 + ((c & 0x3ff) << 10) + (c2 & 0x3ff);
-        i++;
-        out.push(
-          0xf0 | (cp >> 18),
-          0x80 | ((cp >> 12) & 0x3f),
-          0x80 | ((cp >> 6) & 0x3f),
-          0x80 | (cp & 0x3f)
-        );
-      } else {
-        out.push(0xef, 0xbf, 0xbd);
-      }
-    } else if (c >= 0xdc00 && c <= 0xdfff) {
-      out.push(0xef, 0xbf, 0xbd);
-    } else {
-      out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
-    }
-  }
-  return new Uint8Array(out);
-}
 
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
@@ -3687,13 +3968,15 @@ function writeUtf8(buf, str, pos) {
 
 
 function readLogItem(pbf, end) {
-    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
+    return pbf.readFields(readLogItemField, {time: 0, level: "", content: "", clientUuid: "", userAgent: "", screen: "", window: "", url: "", ip: "", region: "", referrer: "", sessionId: "", extendedAttributes: {}, extendedMeta: {}}, end);
 }
 function readLogItemField(tag, obj, pbf) {
     if (tag === 1) obj.time = pbf.readVarint(true);
     else if (tag === 2) obj.level = pbf.readString();
     else if (tag === 3) obj.content = pbf.readString();
     else if (tag === 4) obj.clientUuid = pbf.readString();
+    else if (tag === 5) obj.userAgent = pbf.readString();
+    else if (tag === 6) obj.screen = pbf.readString();
     else if (tag === 7) obj.window = pbf.readString();
     else if (tag === 8) obj.url = pbf.readString();
     else if (tag === 9) obj.ip = pbf.readString();
@@ -3708,6 +3991,8 @@ function writeLogItem(obj, pbf) {
     if (obj.level) pbf.writeStringField(2, obj.level);
     if (obj.content) pbf.writeStringField(3, obj.content);
     if (obj.clientUuid) pbf.writeStringField(4, obj.clientUuid);
+    if (obj.userAgent) pbf.writeStringField(5, obj.userAgent);
+    if (obj.screen) pbf.writeStringField(6, obj.screen);
     if (obj.window) pbf.writeStringField(7, obj.window);
     if (obj.url) pbf.writeStringField(8, obj.url);
     if (obj.ip) pbf.writeStringField(9, obj.ip);
@@ -3756,132 +4041,116 @@ function writeLogItem_FieldEntry14(obj, pbf) {
  */
 
 
-const DB_NAME = 'beacon-db';
-const DB_VERSION = 1;
-
 // 定义对象存储区的名称
 const STORE_LOGS = 'b_dat';
 const STORE_DIGEST = 'digestCache';
 const STORE_META = 'meta';
 
+/** @param {unknown} result */
+function sqliteFirstRow(result) {
+  if (!result?.rows) return null;
+  if (Array.isArray(result.rows)) return result.rows[0] ?? null;
+  if (Array.isArray(result.rows._array)) return result.rows._array[0] ?? null;
+  if (typeof result.rows.item === "function" && result.rows.length > 0) {
+    return result.rows.item(0);
+  }
+  return null;
+}
+
+/** @param {unknown} result */
+function sqliteAllRows(result) {
+  if (!result?.rows) return [];
+  if (Array.isArray(result.rows)) return result.rows;
+  if (Array.isArray(result.rows._array)) return result.rows._array;
+  if (
+    typeof result.rows.length === "number" &&
+    typeof result.rows.item === "function"
+  ) {
+    const list = [];
+    for (let i = 0; i < result.rows.length; i += 1) {
+      list.push(result.rows.item(i));
+    }
+    return list;
+  }
+  return [];
+}
+
 const MixinLogStore = (BaseClass) => {
   /**
-  * LogStore - 一个用于管理 IndexedDB 中日志持久化的基类。
-  * 它处理数据库初始化、模式升级，并为日志、摘要和元数据
-  * 提供原子化的 CRUD 操作方法。
-  */
+   * LogStore — RN 侧通过 `react-native-quick-sqlite`（`../db/database.js`）持久化日志与元数据。
+   * 摘要去重窗口仅 2～3s（见 LogProcessor），Web 上因 SW 可能被回收才持久化 digest；RN 用 `_digestMemoryCache`（内存 Map），不建 digestCache 表。
+   * `b_dat` / `meta` 走 SQLite；digest 走 `_digestMemoryCache`。与 core `ls*` 契约对齐。
+   */
   return class extends BaseClass {
-    /**
-     * @private
-     * @type {Promise<import('idb').IDBPDatabase> | null}
-     */
-    _dbPromise = null;
-
     constructor(...args) {
       super(...args);
+      /**
+       * 摘要 → 时间戳（仅内存，与 `setDigest` / `getAllDigests` / `clearOldDigests` 对齐）。
+       * @type {Map<string, number>}
+       * @private
+       */
+      this._digestMemoryCache = new Map();
+      this._initRuntimeExtendedMeta();
     }
 
     /**
-     * 初始化 IndexedDB 数据库连接和模式。
+     * 初始化运行期扩展元数据（仅设置一次）。
+     * 通过 `applyExtendedMetaIfChanged` 进行增量写入，不阻塞构造流程。
      * @private
+     */
+    _initRuntimeExtendedMeta() {
+      if (typeof this.applyExtendedMetaIfChanged !== "function") return;
+      const os_info = JSON.stringify(serializeSingleValue$1({
+        platform: reactNative.Platform.OS,
+        osVersion: reactNative.Platform.Version,
+        fontScale: reactNative.PixelRatio.getFontScale(),
+        pixelRatio: reactNative.PixelRatio.get(),
+      }));
+      this.applyExtendedMetaIfChanged("os_info", os_info);
+    }
+
+    /**
+     * 初始化 SQLite 表结构（与 `../db/database.js` 共用同一 DB 文件）。
+     * - `b_dat`：高频追加、`value` 为 BLOB（protobuf）；上报时整表读出后清空，仅主键自增即可，无需额外索引。（若本地已是旧版 TEXT 表，需迁移或清库后重建。）
+     * - `meta`：key/value 皆为 TEXT，读写频率一般，WITHOUT ROWID 适合小 KV。
+     * - digestCache：RN 不建表，短窗口去重在内存处理即可。
      */
     lsInit(dbName, dbVersion, storeNames) {
-      this._dbPromise = openDB(dbName, dbVersion, {
-        upgrade(db) {
-          // 创建日志存储区 (b_dat)
-          if (!db.objectStoreNames.contains(STORE_LOGS)) {
-            db.createObjectStore(STORE_LOGS, { keyPath: 'id', autoIncrement: true });
-          }
 
-          // 创建摘要缓存存储区 (digestCache)
-          if (!db.objectStoreNames.contains(STORE_DIGEST)) {
-            const digestStore = db.createObjectStore(STORE_DIGEST, { keyPath: 'digest' });
-            // 创建时间戳索引，用于清理过期摘要
-            digestStore.createIndex('by_timestamp', 'timestamp');
-          }
+      DB.execute(`
+        CREATE TABLE IF NOT EXISTS ${STORE_LOGS} (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          value BLOB NOT NULL
+        );
+      `);
 
-          // 创建元数据存储区 (meta)
-          if (!db.objectStoreNames.contains(STORE_META)) {
-            db.createObjectStore(STORE_META);
-          }
-        },
-      });
+      DB.execute(`
+        CREATE TABLE IF NOT EXISTS ${STORE_META} (
+          key TEXT PRIMARY KEY NOT NULL,
+          value TEXT NOT NULL
+        ) WITHOUT ROWID;
+      `);
     }
 
     /**
-     * 获取数据库实例，如果需要则进行初始化。
-     * @protected
-     * @returns {Promise<import('idb').IDBPDatabase>} 一个解析为数据库实例的 Promise。
-     */
-    async _getDB() {
-      if (!this._dbPromise) {
-        this.lsInit(DB_NAME, DB_VERSION, [STORE_LOGS, STORE_DIGEST, STORE_META]);
-      }
-      return this._dbPromise;
-    }
-
-    /**
-     * 按仓库语义折算游标上 `value` 的负载字节数（与 RN `LENGTH`/byteLength 口径对齐；非磁盘占用）。
-     * @param {string} storeName
-     * @param {unknown} value
-     * @returns {number}
-     * @private
-     */
-    _idbValuePayloadBytes(value) {
-      if (value == null) return 0;
-      if (typeof value === 'string') {
-        return new TextEncoder().encode(value).length;
-      }
-      if (value instanceof ArrayBuffer) {
-        return value.byteLength;
-      }
-      if (ArrayBuffer.isView(value)) {
-        return value.byteLength;
-      }
-      try {
-        return new TextEncoder().encode(JSON.stringify(value)).length;
-      } catch {
-        return 0;
-      }
-    }
-
-    /**
+     * 累加各条 `value` 负载字节数（与 Web 侧游标累加语义一致；不含 SQLite 页/索引开销）。
+     * 日志表 `value` 为 BLOB，`LENGTH(value)` 即为字节长度，可用聚合一次算出。
      * @param {string} storeName
      * @returns {Promise<number>}
      */
     async lsGetStoreSize(storeName) {
-      const db = await this._getDB();
-      const tx = db.transaction(storeName, 'readonly');
-      const store = tx.store;
-      let total = 0;
-      let cursor = await store.openCursor();
-      while (cursor) {
-        total += this._idbValuePayloadBytes(cursor.value);
-        cursor = await cursor.continue();
+      if (storeName === STORE_LOGS) {
+        const result = DB.execute(
+          `SELECT COALESCE(SUM(LENGTH(value)), 0) AS total FROM ${STORE_LOGS};`,
+        );
+        const row = sqliteFirstRow(result);
+        const raw = row != null ? (row.total ?? row.TOTAL) : undefined;
+        const n = raw !== undefined ? Number(raw) : 0;
+        return Number.isFinite(n) ? n : 0;
       }
-      await tx.done;
-      return total;
-    }
-
-    /**
-     * 将数据编码为用于二进制存储的 Uint8Array。
-     * @private
-     * @param {string} data - 要编码的数据。
-     * @returns {Uint8Array} 编码后的二进制数据。
-     */
-    _encode(data) {
-      return utf8Bytes(data);
-    }
-
-    /**
-     * 将 Uint8Array 解码回原始数据。
-     * @private
-     * @param {BufferSource | undefined} buffer - 要解码的二进制数据。
-     * @returns {string | null} 解码后的数据，如果输入为空则返回 null。
-     */
-    _decode(buffer) {
-      if (!buffer) return null;
-      return new TextDecoder().decode(buffer);
+      throw new Error(
+        `${this.constructor.name}.lsGetStoreSize: unsupported store ${storeName}`,
+      );
     }
 
     // --- 日志 (b_dat) 操作 ---
@@ -3892,13 +4161,16 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Promise<{ size: number }>}
      */
     async lsAdd(storeName, value) {
-      console.log("indexeddb add", storeName, value);
-      const db = await this._getDB();
       if (storeName === STORE_LOGS) {
-        value = this.encodeLog(value);
+        const blob = this.encodeLog(value);
+        DB.execute(`INSERT INTO ${STORE_LOGS} (value) VALUES (?);`, [blob]);
+        return {
+          size: blob.byteLength,
+        };
       }
-      await db.add(storeName, value);
-      return {size: this._idbValuePayloadBytes(value)};
+      throw new Error(
+        `${this.constructor.name}.lsAdd: unsupported store ${storeName}`,
+      );
     }
 
     /**
@@ -3906,30 +4178,39 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Promise<object[]>} 解析为所有日志记录数组的 Promise。
      */
     async lsGetAll(storeName) {
-      const db = await this._getDB();
+      if (storeName === STORE_DIGEST) {
+        return Array.from(this._digestMemoryCache, ([digest, timestamp]) => ({
+          digest,
+          timestamp,
+        }));
+      }
       if (storeName === STORE_META) {
-        const tx = db.transaction(STORE_META, 'readonly');
-        const store = tx.store;
-        const allMeta = {};
-        let cursor = await store.openCursor();
-
-        while (cursor) {
-          // The key is already a hash, and the value is decoded.
-          allMeta[cursor.key] = this._decode(cursor.value);
-          cursor = await cursor.continue();
+        const result = DB.execute(`SELECT key, value FROM ${STORE_META};`);
+        const rows = sqliteAllRows(result);
+        const allMeta = Object.create(null);
+        for (const row of rows) {
+          if (row && typeof row.key === "string" && row.value != null) {
+            allMeta[row.key] = String(row.value);
+          }
         }
-
-        await tx.done;
         return allMeta;
       }
       if (storeName === STORE_LOGS) {
-        const rows = await db.getAll(storeName);
-        return rows.map(row => {
-          return this.decodeLog(row);
-        });
+        const result = DB.execute(
+          `SELECT id, value FROM ${STORE_LOGS} ORDER BY id ASC;`,
+        );
+        const rows = sqliteAllRows(result);
+        const logs = [];
+        for (const row of rows) {
+          if (row?.value != null) {
+            logs.push(this.decodeLog(row));
+          }
+        }
+        return logs;
       }
-      const rows = await db.getAll(storeName);
-      return rows;
+      throw new Error(
+        `${this.constructor.name}.lsGetAll: unsupported store ${storeName}`,
+      );
     }
 
     /**
@@ -3937,8 +4218,13 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Promise<void>}
      */
     async lsClear(storeName) {
-      const db = await this._getDB();
-      await db.clear(storeName);
+      if (storeName === STORE_LOGS) {
+        DB.execute(`DELETE FROM ${STORE_LOGS};`);
+        return;
+      }
+      throw new Error(
+        `${this.constructor.name}.lsClear: unsupported store ${storeName}`,
+      );
     }
 
     // --- 摘要 (digestCache) 操作 ---
@@ -3950,17 +4236,32 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Promise<void>}
      */
     async lsPut(storeName, value, key) {
-      const db = await this._getDB();
-      if (storeName === STORE_DIGEST) {
-        await db.put(storeName, value);
-        return;
-      }
       if (storeName === STORE_META) {
-        const encodedValue = this._encode(value);
-        await db.put(storeName, encodedValue, key);
+        if (typeof key !== "string" || key.length === 0) {
+          throw new TypeError(
+            `${this.constructor.name}.lsPut(META): key must be a non-empty string`,
+          );
+        }
+        DB.execute(
+          `
+          INSERT INTO ${STORE_META} (key, value) VALUES (?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+          `,
+          [key, String(value)],
+        );
         return;
       }
-      await db.put(storeName, value, key);
+      if (storeName === STORE_DIGEST) {
+        const digest = value?.digest;
+        const timestamp = value?.timestamp;
+        if (typeof digest === "string" && Number.isFinite(timestamp)) {
+          this._digestMemoryCache.set(digest, timestamp);
+        }
+        return;
+      }
+      throw new Error(
+        `${this.constructor.name}.lsPut: unsupported store ${storeName}`,
+      );
     }
 
     /**
@@ -3969,12 +4270,17 @@ const MixinLogStore = (BaseClass) => {
      * @returns {Promise<any | null>} 解析为解码后的元数据值的 Promise，如果不存在则为 null。
      */
     async lsGet(storeName, key) {
-      const db = await this._getDB();
-      const value = await db.get(storeName, key);
       if (storeName === STORE_META) {
-        return this._decode(value);
+        const result = DB.execute(
+          `SELECT value FROM ${STORE_META} WHERE key = ? LIMIT 1;`,
+          [key],
+        );
+        const row = sqliteFirstRow(result);
+        return row?.value != null ? String(row.value) : null;
       }
-      return value;
+      throw new Error(
+        `${this.constructor.name}.lsGet: unsupported store ${storeName}`,
+      );
     }
 
     /**
@@ -3989,15 +4295,12 @@ const MixinLogStore = (BaseClass) => {
       if (storeName !== STORE_DIGEST) {
         throw new Error(`${this.constructor.name}.lsDeleteMany: unsupported store ${storeName}`);
       }
-      const db = await this._getDB();
-      const tx = db.transaction(STORE_DIGEST, 'readwrite');
-      const index = tx.store.index('by_timestamp');
-      let cursor = await index.openCursor(IDBKeyRange.upperBound(lte));
-      while (cursor) {
-        await cursor.delete();
-        cursor = await cursor.continue();
+      for (const d of [...this._digestMemoryCache.keys()]) {
+        const ts = this._digestMemoryCache.get(d);
+        if (ts !== undefined && ts <= lte) {
+          this._digestMemoryCache.delete(d);
+        }
       }
-      await tx.done;
     }
 
     /**
@@ -4012,55 +4315,210 @@ const MixinLogStore = (BaseClass) => {
     }
 
     /**
-     * 解码日志
-     * @param {Uint8Array} log - 日志数据
+     * 解码日志（原始字节或 SQLite 行 `{ id, value }` / IndexedDB 存下的单行结构）。
+     * @param {Uint8Array | ArrayBuffer | { value?: BufferSource }} log
      * @returns {LogItem}
      */
     decodeLog(log) {
-      const pbf = new Pbf(log);
+      let bytes = log;
+      if (log != null && typeof log === 'object') {
+        const isBinary =
+          log instanceof ArrayBuffer || ArrayBuffer.isView(log);
+        if (!isBinary) {
+          const v = log.value;
+          if (v instanceof ArrayBuffer || ArrayBuffer.isView(v)) {
+            bytes = v;
+          }
+        }
+      }
+      const pbf = new Pbf(bytes);
       return readLogItem(pbf);
     }
   }
 };
 
-/** 打包 service worker 时由 Rollup `resolveId` 解析到 `@logbeacon/core/LogAggregator-sls` 或 `LogAggregator-loki`。 */
+/** 打包时由 Rollup `resolveId` 解析到 `@logbeacon/core/LogAggregator-sls` 或 `LogAggregator-loki`（视构建变体而定）。 */
 
 const LogAggregator = MixinLogStore(LogAggregator$1);
 
 let taskChain = Promise.resolve();
+/** @type {LogAggregator | null} */
+let aggregator = null;
 
-function genHandleMessage() {
-  const logAggregator = new LogAggregator({
-    flushInterval: 5 * 60 * 1000, // 5 minutes
-    flushSize: 3 * 1024 * 1024, // 3MB
-  });
+function getAggregator() {
+  if (!aggregator) {
+    aggregator = new LogAggregator({
+      flushInterval: 5 * 60 * 1000,
+      flushSize: 3 * 1024 * 1024,
+    });
+  }
+  return aggregator;
+}
 
-  const handle = (event) => {
-    if (!event.data || typeof event.data !== 'object') {
-      return;
-    }
-
-    const newTask = () => logAggregator.handleEvent(event.data);
-    taskChain = taskChain.then(newTask);
-    event.waitUntil(taskChain);
+/**
+ * 将消息放入串行任务链，保证日志按投递顺序处理。
+ * @param {{ type: string, payload?: any }} message
+ * @returns {Promise<void>}
+ */
+function enqueueMessage(message) {
+  const run = async () => {
+    if (!message || typeof message !== "object") return;
+    await getAggregator().handleEvent(message);
   };
+  taskChain = taskChain.then(run, run);
+  return taskChain.catch((error) => {
+    console.error("[logbeacon] enqueue message failed:", error);
+  });
+}
 
-  return (event) => {
-    try {
-      handle(event);
-    } catch (e) {
-    }
+/**
+ * React Native 环境下的日志附加信息（在 core 的 `time`、`extendedAttributes` 之上追加窗口/会话等字段）
+ * @typedef {Object} RNLogExtraInfo
+ * @property {number} time - 毫秒时间戳
+ * @property {Object.<string, string>} extendedAttributes - 来自全局 `LOGS_CONTEXT`
+ * @property {string} windowWidth - 当前窗口宽度
+ * @property {string} windowHeight - 当前窗口高度
+ * @property {string} orientation - 屏幕方向（portrait / landscape）
+ * @property {string} clientUuid
+ * @property {string} sessionId
+ */
+
+const sessionStorage = createMemoryStorage();
+
+const genReadableUUID = () => {
+  let uuid;
+  return () => {
+    if (uuid) return uuid;
+    const getOrCreateUUID$1 = getOrCreateUUID.bind(localStorage);
+    uuid = getOrCreateUUID$1();
+    return uuid;
+  }
+};
+
+const readClientUUID = genReadableUUID();
+
+/**
+ * @returns {RNLogExtraInfo}
+ */
+function getLogExtraInfo() {
+  const extraInfo = getLogExtraInfo$1();
+  const { width, height } = reactNative.Dimensions.get("window");
+  const orientation = width >= height ? "landscape" : "portrait";
+  return {
+    ...extraInfo,
+    window: JSON.stringify({ width, height, orientation }),
+    orientation,
+    clientUuid: readClientUUID(),
+    sessionId: getOrCreateSessionId.call(sessionStorage),
   };
 }
 
-const handleMessage = genHandleMessage();
+/**
+ * 发送日志到 Service Worker（或回退为页面事件）
+ * @param {"trace"|"debug"|"info"|"warn"|"error"} level - 日志等级
+ * @param {any[]} logs - 需要发送的日志数组
+ * @returns {Promise<void>}
+ */
+function sendLog(level, logs) {
+  const extraInfo = getLogExtraInfo();
+  const base = {
+    level,
+    content: serializeLogContent(logs),
+    ...extraInfo
+  };
+  
+  // 发送到 service worker，消息结构带 type
+  const msg = {
+    type: 'log',
+    payload: base
+  };
 
-self.addEventListener('message', handleMessage);
+  enqueueMessage(msg);
+}
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(self.skipWaiting());
+/**
+ * @file 常量定义文件
+ */
+
+/**
+ * 预先计算好的元数据键的 SHA-256 哈希值，用于在 IndexedDB 中作为键名，以增强隐私性。
+ * @const {Object<string, string>}
+ */
+const META_KEYS = {
+  IP: 'bb9af5d1915da1fbc132ced081325efcd2e63e4804f96890f42e9739677237a4',
+  REGION: 'c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6',
+  LAST_UPDATE_TIME: '0682cd61a299947aa5324230d6d64eb1eef0a9b612cbdd2c7ca25355fb614201',
+  LOG_CONTEXT: '5d9a7a8550f5914b8895af9c0dae801a3da0a102e411c2c505efe37f06a011fa',
+  BEACON_URL: '24950352bd3207a680735e5075d9c1256b9c13d1116235b31305dfb256c5470a', // for 'beaconUrl'
+};
+
+/**
+ * 可作为元数据键持久化的 META_KEYS 哈希值白名单（与 {@link META_KEYS} 的 value 一一对应）。
+ * @type {readonly string[]}
+ */
+Object.freeze(Object.values(META_KEYS));
+
+/** 挂载到全局对象上的属性名，可通过 globalThis[LOG_BEACON_GLOBAL_KEY] 访问 */
+const LOG_BEACON_GLOBAL_KEY = "LogBeacon";
+
+let listenerRegistered = false;
+let currentAppState = reactNative.AppState.currentState || "active";
+
+/**
+ * 注册 RN 生命周期监听（幂等，只注册一次）。
+ * - 启动时投递 page-load
+ * - active -> 非 active：投递 page-hidden（触发 flush）
+ * - 非 active -> active：投递 page-visible
+ */
+function setupLifecycleListeners() {
+  if (listenerRegistered) return;
+  listenerRegistered = true;
+
+  enqueueMessage({ type: "page-load" });
+
+  reactNative.AppState.addEventListener("change", (nextAppState) => {
+    const prev = currentAppState;
+    currentAppState = nextAppState;
+
+    if (prev !== "active" && nextAppState === "active") {
+      enqueueMessage({ type: "page-visible" });
+      return;
+    }
+
+    if (prev === "active" && (nextAppState === "inactive" || nextAppState === "background")) {
+      enqueueMessage({ type: "page-hidden" });
+    }
+  });
+}
+
+/**
+ * 指定日志上报接口地址（与 Web `data-beacon-url` 触发的 `config-update` 一致）。
+ * @param {string} beaconUrl
+ * @returns {Promise<void>}
+ */
+function setBeaconUrl(beaconUrl) {
+  if (typeof beaconUrl !== "string" || beaconUrl.trim().length === 0) {
+    throw new TypeError("setBeaconUrl: beaconUrl must be a non-empty string");
+  }
+  return enqueueMessage({
+    type: "config-update",
+    payload: { beaconUrl: beaconUrl.trim() },
+  });
+}
+
+
+const log = new ConsoleLogger({
+  storage: localStorage,
+  forwardLog: sendLog,
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
-});
+setupLifecycleListeners();
+
+const g = getGlobalObject();
+if (g) {
+  g[LOG_BEACON_GLOBAL_KEY] = log;
+}
+
+exports.default = log;
+exports.setBeaconUrl = setBeaconUrl;
+//# sourceMappingURL=logs.cjs.map

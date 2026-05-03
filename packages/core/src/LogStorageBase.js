@@ -46,7 +46,7 @@ export class LogStorageBase {
    * 插入一条记录（对应 `add`；若主键冲突应抛错）。
    * @param {string} storeName
    * @param {unknown} value
-   * @returns {Promise<{key: StorageKey, size: number}>}
+   * @returns {Promise<{size: number}>}
    */
   async lsAdd(storeName, value) {
     throw new Error(`${this.constructor.name}.lsAdd() must be implemented by subclass`);
@@ -86,7 +86,7 @@ export class LogStorageBase {
    * @param {string} storeName
    * @param {unknown} value
    * @param {StorageKey} [key]
-   * @returns {Promise<StorageKey>}
+   * @returns {Promise<void>}
    */
   async lsPut(storeName, value, key) {
     throw new Error(`${this.constructor.name}.lsPut() must be implemented by subclass`);

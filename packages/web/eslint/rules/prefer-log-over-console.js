@@ -4,7 +4,7 @@
 "use strict";
 
 const MESSAGE_ID = "preferLogOverConsole";
-const DEFAULT_IMPORT_SOURCE = "logbeacon";
+const DEFAULT_IMPORT_SOURCE = "@logbeacon/web";
 const DEFAULT_IMPORT_NAME = "log";
 
 const DEFAULT_METHOD_MAP = {

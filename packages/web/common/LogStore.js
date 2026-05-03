@@ -68,7 +68,8 @@ export const MixinLogStore = (BaseClass) => {
     }
 
     /**
-     * 将单条 IDB value 折算为用于 `lsGetStoreSize` 累加的字节数。
+     * 按仓库语义折算游标上 `value` 的负载字节数（与 RN `LENGTH`/byteLength 口径对齐；非磁盘占用）。
+     * @param {string} storeName
      * @param {unknown} value
      * @returns {number}
      * @private
@@ -135,7 +136,7 @@ export const MixinLogStore = (BaseClass) => {
     /**
      * 向数据库中添加一条日志记录。
      * @param {object} logData - 要存储的日志数据。
-     * @returns {Promise<number>} 解析为新日志记录ID的 Promise。
+     * @returns {Promise<{ size: number }>}
      */
     async lsAdd(storeName, value) {
       console.log("indexeddb add", storeName, value);
@@ -143,8 +144,8 @@ export const MixinLogStore = (BaseClass) => {
       if (storeName === STORE_LOGS) {
         value = this.encodeLog(value);
       }
-      const key = await db.add(storeName, value);
-      return {key, size: this._idbValuePayloadBytes(value)};
+      await db.add(storeName, value);
+      return {size: this._idbValuePayloadBytes(value)};
     }
 
     /**
@@ -193,18 +194,20 @@ export const MixinLogStore = (BaseClass) => {
      * 在数据库中设置或更新一个日志摘要及其时间戳。
      * @param {string} digest - 日志内容的摘要字符串。
      * @param {number} timestamp - 日志的时间戳。
-     * @returns {Promise<string>} 解析为摘要键的 Promise。
+     * @returns {Promise<void>}
      */
     async lsPut(storeName, value, key) {
       const db = await this._getDB();
       if (storeName === STORE_DIGEST) {
-        return db.put(storeName, value);
+        await db.put(storeName, value);
+        return;
       }
       if (storeName === STORE_META) {
         const encodedValue = this._encode(value);
-        return db.put(storeName, encodedValue, key);
+        await db.put(storeName, encodedValue, key);
+        return;
       }
-      return db.put(storeName, value, key)
+      await db.put(storeName, value, key);
     }
 
     /**

@@ -1,5 +1,5 @@
 {
-    "name": "logbeacon",
+    "name": "@logbeacon/web",
     "version": "1.7.2",
     "type": "module",
     "module": "dist/core/logs.js",

@@ -1,33 +1,58 @@
-import { openDB } from 'idb';
-import { utf8Bytes } from "@logbeacon/core/utils"
 import Pbf from 'pbf';
 import { PixelRatio, Platform } from "react-native";
+import { DB } from "../db/database.js";
 import {writeLogItem, readLogItem} from './log.proto.js';
 import { serializeSingleValue } from "./serializeLogContent.js";
 import {
   STORE_LOGS,
   STORE_DIGEST,
   STORE_META,
-  DB_NAME,
-  DB_VERSION,
 } from "@logbeacon/core/LogStore";
 
+/** @param {unknown} result */
+function sqliteFirstRow(result) {
+  if (!result?.rows) return null;
+  if (Array.isArray(result.rows)) return result.rows[0] ?? null;
+  if (Array.isArray(result.rows._array)) return result.rows._array[0] ?? null;
+  if (typeof result.rows.item === "function" && result.rows.length > 0) {
+    return result.rows.item(0);
+  }
+  return null;
+}
+
+/** @param {unknown} result */
+function sqliteAllRows(result) {
+  if (!result?.rows) return [];
+  if (Array.isArray(result.rows)) return result.rows;
+  if (Array.isArray(result.rows._array)) return result.rows._array;
+  if (
+    typeof result.rows.length === "number" &&
+    typeof result.rows.item === "function"
+  ) {
+    const list = [];
+    for (let i = 0; i < result.rows.length; i += 1) {
+      list.push(result.rows.item(i));
+    }
+    return list;
+  }
+  return [];
+}
 
 export const MixinLogStore = (BaseClass) => {
   /**
-  * LogStore - 一个用于管理 IndexedDB 中日志持久化的基类。
-  * 它处理数据库初始化、模式升级，并为日志、摘要和元数据
-  * 提供原子化的 CRUD 操作方法。
-  */
+   * LogStore — RN 侧通过 `react-native-quick-sqlite`（`../db/database.js`）持久化日志与元数据。
+   * 摘要去重窗口仅 2～3s（见 LogProcessor），Web 上因 SW 可能被回收才持久化 digest；RN 用 `_digestMemoryCache`（内存 Map），不建 digestCache 表。
+   * `b_dat` / `meta` 走 SQLite；digest 走 `_digestMemoryCache`。与 core `ls*` 契约对齐。
+   */
   return class extends BaseClass {
-    /**
-     * @private
-     * @type {Promise<import('idb').IDBPDatabase> | null}
-     */
-    _dbPromise = null;
-
     constructor(...args) {
       super(...args);
+      /**
+       * 摘要 → 时间戳（仅内存，与 `setDigest` / `getAllDigests` / `clearOldDigests` 对齐）。
+       * @type {Map<string, number>}
+       * @private
+       */
+      this._digestMemoryCache = new Map();
       this._initRuntimeExtendedMeta();
     }
 
@@ -48,105 +73,50 @@ export const MixinLogStore = (BaseClass) => {
     }
 
     /**
-     * 初始化 IndexedDB 数据库连接和模式。
-     * @private
+     * 初始化 SQLite 表结构（与 `../db/database.js` 共用同一 DB 文件）。
+     * - `b_dat`：高频追加、`value` 为 BLOB（protobuf）；上报时整表读出后清空，仅主键自增即可，无需额外索引。（若本地已是旧版 TEXT 表，需迁移或清库后重建。）
+     * - `meta`：key/value 皆为 TEXT，读写频率一般，WITHOUT ROWID 适合小 KV。
+     * - digestCache：RN 不建表，短窗口去重在内存处理即可。
      */
     lsInit(dbName, dbVersion, storeNames) {
-      this._dbPromise = openDB(dbName, dbVersion, {
-        upgrade(db) {
-          // 创建日志存储区 (b_dat)
-          if (!db.objectStoreNames.contains(STORE_LOGS)) {
-            db.createObjectStore(STORE_LOGS, { keyPath: 'id', autoIncrement: true });
-          }
+      void dbName;
+      void dbVersion;
+      void storeNames;
 
-          // 创建摘要缓存存储区 (digestCache)
-          if (!db.objectStoreNames.contains(STORE_DIGEST)) {
-            const digestStore = db.createObjectStore(STORE_DIGEST, { keyPath: 'digest' });
-            // 创建时间戳索引，用于清理过期摘要
-            digestStore.createIndex('by_timestamp', 'timestamp');
-          }
+      DB.execute(`
+        CREATE TABLE IF NOT EXISTS ${STORE_LOGS} (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          value BLOB NOT NULL
+        );
+      `);
 
-          // 创建元数据存储区 (meta)
-          if (!db.objectStoreNames.contains(STORE_META)) {
-            db.createObjectStore(STORE_META);
-          }
-        },
-      });
+      DB.execute(`
+        CREATE TABLE IF NOT EXISTS ${STORE_META} (
+          key TEXT PRIMARY KEY NOT NULL,
+          value TEXT NOT NULL
+        ) WITHOUT ROWID;
+      `);
     }
 
     /**
-     * 获取数据库实例，如果需要则进行初始化。
-     * @protected
-     * @returns {Promise<import('idb').IDBPDatabase>} 一个解析为数据库实例的 Promise。
-     */
-    async _getDB() {
-      if (!this._dbPromise) {
-        this.lsInit(DB_NAME, DB_VERSION, [STORE_LOGS, STORE_DIGEST, STORE_META]);
-      }
-      return this._dbPromise;
-    }
-
-    /**
-     * 将单条 IDB value 折算为用于 `lsGetStoreSize` 累加的字节数。
-     * @param {unknown} value
-     * @returns {number}
-     * @private
-     */
-    _idbValuePayloadBytes(value) {
-      if (value == null) return 0;
-      if (typeof value === 'string') {
-        return new TextEncoder().encode(value).length;
-      }
-      if (value instanceof ArrayBuffer) {
-        return value.byteLength;
-      }
-      if (ArrayBuffer.isView(value)) {
-        return value.byteLength;
-      }
-      try {
-        return new TextEncoder().encode(JSON.stringify(value)).length;
-      } catch {
-        return 0;
-      }
-    }
-
-    /**
+     * 累加各条 `value` 负载字节数（与 Web 侧游标累加语义一致；不含 SQLite 页/索引开销）。
+     * 日志表 `value` 为 BLOB，`LENGTH(value)` 即为字节长度，可用聚合一次算出。
      * @param {string} storeName
      * @returns {Promise<number>}
      */
     async lsGetStoreSize(storeName) {
-      const db = await this._getDB();
-      const tx = db.transaction(storeName, 'readonly');
-      const store = tx.store;
-      let total = 0;
-      let cursor = await store.openCursor();
-      while (cursor) {
-        total += this._idbValuePayloadBytes(cursor.value);
-        cursor = await cursor.continue();
+      if (storeName === STORE_LOGS) {
+        const result = DB.execute(
+          `SELECT COALESCE(SUM(LENGTH(value)), 0) AS total FROM ${STORE_LOGS};`,
+        );
+        const row = sqliteFirstRow(result);
+        const raw = row != null ? (row.total ?? row.TOTAL) : undefined;
+        const n = raw !== undefined ? Number(raw) : 0;
+        return Number.isFinite(n) ? n : 0;
       }
-      await tx.done;
-      return total;
-    }
-
-    /**
-     * 将数据编码为用于二进制存储的 Uint8Array。
-     * @private
-     * @param {string} data - 要编码的数据。
-     * @returns {Uint8Array} 编码后的二进制数据。
-     */
-    _encode(data) {
-      return utf8Bytes(data);
-    }
-
-    /**
-     * 将 Uint8Array 解码回原始数据。
-     * @private
-     * @param {BufferSource | undefined} buffer - 要解码的二进制数据。
-     * @returns {string | null} 解码后的数据，如果输入为空则返回 null。
-     */
-    _decode(buffer) {
-      if (!buffer) return null;
-      return new TextDecoder().decode(buffer);
+      throw new Error(
+        `${this.constructor.name}.lsGetStoreSize: unsupported store ${storeName}`,
+      );
     }
 
     // --- 日志 (b_dat) 操作 ---
@@ -154,15 +124,19 @@ export const MixinLogStore = (BaseClass) => {
     /**
      * 向数据库中添加一条日志记录。
      * @param {object} logData - 要存储的日志数据。
-     * @returns {Promise<number>} 解析为新日志记录ID的 Promise。
+     * @returns {Promise<{ size: number }>}
      */
     async lsAdd(storeName, value) {
-      const db = await this._getDB();
       if (storeName === STORE_LOGS) {
-        value = this.encodeLog(value);
+        const blob = this.encodeLog(value);
+        DB.execute(`INSERT INTO ${STORE_LOGS} (value) VALUES (?);`, [blob]);
+        return {
+          size: blob.byteLength,
+        };
       }
-      const key = await db.add(storeName, value);
-      return {key, size: this._idbValuePayloadBytes(value)};
+      throw new Error(
+        `${this.constructor.name}.lsAdd: unsupported store ${storeName}`,
+      );
     }
 
     /**
@@ -170,30 +144,39 @@ export const MixinLogStore = (BaseClass) => {
      * @returns {Promise<object[]>} 解析为所有日志记录数组的 Promise。
      */
     async lsGetAll(storeName) {
-      const db = await this._getDB();
+      if (storeName === STORE_DIGEST) {
+        return Array.from(this._digestMemoryCache, ([digest, timestamp]) => ({
+          digest,
+          timestamp,
+        }));
+      }
       if (storeName === STORE_META) {
-        const tx = db.transaction(STORE_META, 'readonly');
-        const store = tx.store;
-        const allMeta = {};
-        let cursor = await store.openCursor();
-
-        while (cursor) {
-          // The key is already a hash, and the value is decoded.
-          allMeta[cursor.key] = this._decode(cursor.value);
-          cursor = await cursor.continue();
+        const result = DB.execute(`SELECT key, value FROM ${STORE_META};`);
+        const rows = sqliteAllRows(result);
+        const allMeta = Object.create(null);
+        for (const row of rows) {
+          if (row && typeof row.key === "string" && row.value != null) {
+            allMeta[row.key] = String(row.value);
+          }
         }
-
-        await tx.done;
         return allMeta;
       }
       if (storeName === STORE_LOGS) {
-        const rows = await db.getAll(storeName);
-        return rows.map(row => {
-          return this.decodeLog(row);
-        });
+        const result = DB.execute(
+          `SELECT id, value FROM ${STORE_LOGS} ORDER BY id ASC;`,
+        );
+        const rows = sqliteAllRows(result);
+        const logs = [];
+        for (const row of rows) {
+          if (row?.value != null) {
+            logs.push(this.decodeLog(row));
+          }
+        }
+        return logs;
       }
-      const rows = await db.getAll(storeName);
-      return rows;
+      throw new Error(
+        `${this.constructor.name}.lsGetAll: unsupported store ${storeName}`,
+      );
     }
 
     /**
@@ -201,8 +184,13 @@ export const MixinLogStore = (BaseClass) => {
      * @returns {Promise<void>}
      */
     async lsClear(storeName) {
-      const db = await this._getDB();
-      await db.clear(storeName);
+      if (storeName === STORE_LOGS) {
+        DB.execute(`DELETE FROM ${STORE_LOGS};`);
+        return;
+      }
+      throw new Error(
+        `${this.constructor.name}.lsClear: unsupported store ${storeName}`,
+      );
     }
 
     // --- 摘要 (digestCache) 操作 ---
@@ -211,18 +199,36 @@ export const MixinLogStore = (BaseClass) => {
      * 在数据库中设置或更新一个日志摘要及其时间戳。
      * @param {string} digest - 日志内容的摘要字符串。
      * @param {number} timestamp - 日志的时间戳。
-     * @returns {Promise<string>} 解析为摘要键的 Promise。
+     * @returns {Promise<void>}
      */
     async lsPut(storeName, value, key) {
-      const db = await this._getDB();
-      if (storeName === STORE_DIGEST) {
-        return db.put(storeName, value);
-      }
       if (storeName === STORE_META) {
-        const encodedValue = this._encode(value);
-        return db.put(storeName, encodedValue, key);
+        if (typeof key !== "string" || key.length === 0) {
+          throw new TypeError(
+            `${this.constructor.name}.lsPut(META): key must be a non-empty string`,
+          );
+        }
+        DB.execute(
+          `
+          INSERT INTO ${STORE_META} (key, value) VALUES (?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+          `,
+          [key, String(value)],
+        );
+        return;
       }
-      return db.put(storeName, value, key)
+      if (storeName === STORE_DIGEST) {
+        void key;
+        const digest = value?.digest;
+        const timestamp = value?.timestamp;
+        if (typeof digest === "string" && Number.isFinite(timestamp)) {
+          this._digestMemoryCache.set(digest, timestamp);
+        }
+        return;
+      }
+      throw new Error(
+        `${this.constructor.name}.lsPut: unsupported store ${storeName}`,
+      );
     }
 
     /**
@@ -231,12 +237,17 @@ export const MixinLogStore = (BaseClass) => {
      * @returns {Promise<any | null>} 解析为解码后的元数据值的 Promise，如果不存在则为 null。
      */
     async lsGet(storeName, key) {
-      const db = await this._getDB();
-      const value = await db.get(storeName, key);
       if (storeName === STORE_META) {
-        return this._decode(value);
+        const result = DB.execute(
+          `SELECT value FROM ${STORE_META} WHERE key = ? LIMIT 1;`,
+          [key],
+        );
+        const row = sqliteFirstRow(result);
+        return row?.value != null ? String(row.value) : null;
       }
-      return value;
+      throw new Error(
+        `${this.constructor.name}.lsGet: unsupported store ${storeName}`,
+      );
     }
 
     /**
@@ -251,15 +262,12 @@ export const MixinLogStore = (BaseClass) => {
       if (storeName !== STORE_DIGEST) {
         throw new Error(`${this.constructor.name}.lsDeleteMany: unsupported store ${storeName}`);
       }
-      const db = await this._getDB();
-      const tx = db.transaction(STORE_DIGEST, 'readwrite');
-      const index = tx.store.index('by_timestamp');
-      let cursor = await index.openCursor(IDBKeyRange.upperBound(lte));
-      while (cursor) {
-        await cursor.delete();
-        cursor = await cursor.continue();
+      for (const d of [...this._digestMemoryCache.keys()]) {
+        const ts = this._digestMemoryCache.get(d);
+        if (ts !== undefined && ts <= lte) {
+          this._digestMemoryCache.delete(d);
+        }
       }
-      await tx.done;
     }
 
     /**
@@ -274,12 +282,23 @@ export const MixinLogStore = (BaseClass) => {
     }
 
     /**
-     * 解码日志
-     * @param {Uint8Array} log - 日志数据
+     * 解码日志（原始字节或 SQLite 行 `{ id, value }` / IndexedDB 存下的单行结构）。
+     * @param {Uint8Array | ArrayBuffer | { value?: BufferSource }} log
      * @returns {LogItem}
      */
     decodeLog(log) {
-      const pbf = new Pbf(log);
+      let bytes = log;
+      if (log != null && typeof log === 'object') {
+        const isBinary =
+          log instanceof ArrayBuffer || ArrayBuffer.isView(log);
+        if (!isBinary) {
+          const v = log.value;
+          if (v instanceof ArrayBuffer || ArrayBuffer.isView(v)) {
+            bytes = v;
+          }
+        }
+      }
+      const pbf = new Pbf(bytes);
       return readLogItem(pbf);
     }
   }

@@ -7,7 +7,7 @@ function getDefaultExportFromCjs (x) {
  */
 
 const MESSAGE_ID = "preferLogOverConsole";
-const DEFAULT_IMPORT_SOURCE = "logbeacon";
+const DEFAULT_IMPORT_SOURCE = "@logbeacon/react-native";
 const DEFAULT_IMPORT_NAME = "log";
 
 const DEFAULT_METHOD_MAP = {

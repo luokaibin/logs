@@ -9,7 +9,7 @@ importers:
   .:
     devDependencies:
       turbo:
-        specifier: ^2.5.4
+        specifier: ^2.9.7
         version: 2.9.7
 
   examples/next-log-test:
@@ -39,43 +39,6 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
-
-  logs:
-    dependencies:
-      fflate:
-        specifier: ^0.8.2
-        version: 0.8.2
-      idb:
-        specifier: ^8.0.3
-        version: 8.0.3
-      loglevel:
-        specifier: ^1.9.2
-        version: 1.9.2
-      pbf:
-        specifier: ^4.0.1
-        version: 4.0.1
-      ua-parser-js:
-        specifier: ^2.0.6
-        version: 2.0.6
-    devDependencies:
-      '@rollup/plugin-commonjs':
-        specifier: ^24.0.0
-        version: 24.1.0(rollup@3.29.5)
-      '@rollup/plugin-node-resolve':
-        specifier: ^15.0.0
-        version: 15.3.1(rollup@3.29.5)
-      '@rollup/plugin-terser':
-        specifier: ^0.4.4
-        version: 0.4.4(rollup@3.29.5)
-      javascript-obfuscator:
-        specifier: ^4.1.1
-        version: 4.1.1
-      rollup:
-        specifier: ^3.20.0
-        version: 3.29.5
-      rollup-plugin-obfuscator:
-        specifier: ^1.1.0
-        version: 1.1.0(javascript-obfuscator@4.1.1)(rollup@3.29.5)
 
   packages/core:
     dependencies:
@@ -107,15 +70,9 @@ importers:
       '@logbeacon/core':
         specifier: workspace:*
         version: link:../core
-      '@logbeacon/platforms':
-        specifier: workspace:*
-        version: link:../platforms
       fflate:
         specifier: ^0.8.2
         version: 0.8.2
-      idb:
-        specifier: ^8.0.3
-        version: 8.0.3
       pbf:
         specifier: ^4.0.1
         version: 4.0.1
@@ -125,9 +82,6 @@ importers:
       react-native-quick-sqlite:
         specifier: ^8.2.7
         version: 8.2.7(react-native@0.85.2(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))(react@19.2.5)
-      ua-parser-js:
-        specifier: ^2.0.6
-        version: 2.0.6
     devDependencies:
       '@rollup/plugin-commonjs':
         specifier: ^24.0.0
@@ -135,18 +89,9 @@ importers:
       '@rollup/plugin-node-resolve':
         specifier: ^15.0.0
         version: 15.3.1(rollup@3.29.5)
-      '@rollup/plugin-terser':
-        specifier: ^0.4.4
-        version: 0.4.4(rollup@3.29.5)
-      javascript-obfuscator:
-        specifier: ^4.1.1
-        version: 4.1.1
       rollup:
         specifier: ^3.20.0
         version: 3.29.5
-      rollup-plugin-obfuscator:
-        specifier: ^1.1.0
-        version: 1.1.0(javascript-obfuscator@4.1.1)(rollup@3.29.5)
 
   packages/web:
     dependencies:
@@ -1500,10 +1445,6 @@ packages:
 
   lodash.throttle@4.1.1:
     resolution: {integrity: sha512-wIkUCfVKpVsWo3JSZlc+8MB5it+2AN5W8J7YVMST30UrvcQNZ1Okbj+rbVniijTWE6FGYy4XJq/rHkas8qJMLQ==}
-
-  loglevel@1.9.2:
-    resolution: {integrity: sha512-HgMmCqIJSAKqo68l0rS2AanEWfkxaZ5wNiEFb5ggm08lDs9Xl2KxBlX3PTcaD2chBM1gXAYf491/M2Rv8Jwayg==}
-    engines: {node: '>= 0.6.0'}
 
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
@@ -3414,8 +3355,6 @@ snapshots:
       - supports-color
 
   lodash.throttle@4.1.1: {}
-
-  loglevel@1.9.2: {}
 
   loose-envify@1.4.0:
     dependencies:

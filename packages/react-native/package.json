@@ -2,58 +2,39 @@
   "name": "@logbeacon/react-native",
   "version": "1.7.2",
   "type": "module",
-  "module": "dist/core/logs.js",
-  "description": "浏览器端日志采集与上报工具，支持多种日志服务后端，包括阿里云日志服务(SLS)和Grafana Loki",
+  "module": "./dist/sls/logs.js",
+  "description": "React Native 日志采集与上报（阿里云 SLS / Grafana Loki），入口与 Web core/logs 对齐并按变体分包",
   "exports": {
     ".": {
-      "import": "./dist/core/logs.js",
-      "require": "./dist/core/logs.cjs",
+      "import": "./dist/sls/logs.js",
+      "require": "./dist/sls/logs.cjs",
       "types": "./dist/types/logs.d.ts",
-      "default": "./dist/core/logs.js"
+      "default": "./dist/sls/logs.js"
     },
     "./sls": {
-      "import": "./dist/sls/slsClient.js",
-      "require": "./dist/sls/slsClient.cjs",
-      "default": "./dist/sls/slsClient.js",
-      "types": "./dist/types/slsClient.d.ts"
-    },
-    "./sls/beacon": {
-      "import": "./dist/sls/beacon.js",
-      "default": "./dist/sls/beacon.js"
-    },
-    "./sls/sw": {
-      "import": "./dist/sls/beacon-sw.js",
-      "default": "./dist/sls/beacon-sw.js"
+      "import": "./dist/sls/logs.js",
+      "require": "./dist/sls/logs.cjs",
+      "types": "./dist/types/logs.d.ts",
+      "default": "./dist/sls/logs.js"
     },
     "./loki": {
-      "import": "./dist/loki/lokiClient.js",
-      "require": "./dist/loki/lokiClient.cjs",
-      "default": "./dist/loki/lokiClient.js",
-      "types": "./dist/types/lokiClient.d.ts"
-    },
-    "./loki/beacon": {
-      "import": "./dist/loki/beacon.js",
-      "default": "./dist/loki/beacon.js"
-    },
-    "./loki/sw": {
-      "import": "./dist/loki/beacon-sw.js",
-      "default": "./dist/loki/beacon-sw.js"
+      "import": "./dist/loki/logs.js",
+      "require": "./dist/loki/logs.cjs",
+      "types": "./dist/types/logs.d.ts",
+      "default": "./dist/loki/logs.js"
     },
     "./eslint": {
       "require": "./dist/eslint/index.js",
       "import": "./dist/eslint/index.mjs",
       "default": "./dist/eslint/index.mjs",
       "types": "./dist/types/eslintPlugin.d.ts"
-    },
-    "./dev-tools/log-filter": {
-      "default": "./dist/dev-tools/log-filter.js"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build:RN": "rollup -c rollup.config.js",
+    "build": "rollup -c rollup.config.js",
     "dev:RN": "rollup -c rollup.config.js -w",
     "test": "echo \"Error: no test specified\" && exit 1",
     "clean": "rm -rf dist",
@@ -89,22 +70,16 @@
   "peerDependencies": {
     "react-native": ">=0.64.0"
   },
-    "dependencies": {
-      "@logbeacon/platforms": "workspace:*",
-      "@logbeacon/core": "workspace:*",
+  "dependencies": {
+    "@logbeacon/core": "workspace:*",
     "fflate": "^0.8.2",
-    "idb": "^8.0.3",
     "pbf": "^4.0.1",
-    "react-native-quick-sqlite": "^8.2.7",
-    "ua-parser-js": "^2.0.6"
+    "react-native-quick-sqlite": "^8.2.7"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^24.0.0",
     "@rollup/plugin-node-resolve": "^15.0.0",
-    "@rollup/plugin-terser": "^0.4.4",
-    "javascript-obfuscator": "^4.1.1",
-    "rollup": "^3.20.0",
-    "rollup-plugin-obfuscator": "^1.1.0"
+    "rollup": "^3.20.0"
   },
   "engines": {
     "node": ">=14.0.0"

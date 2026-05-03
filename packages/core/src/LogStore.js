@@ -24,10 +24,9 @@ export class LogStore extends LogStorageBase {
   /**
    * 向数据库中添加一条日志记录。
    * @param {object} logData - 要存储的日志数据。
-   * @returns {Promise<{key: StorageKey, size: number}>} 解析为新日志记录ID的 Promise。
+   * @returns {Promise<{size: number}>}
    */
   async insertLog(logData) {
-    // 注意：IndexedDB add/put 的返回值是 key
     return this.lsAdd(STORE_LOGS, logData);
   }
 
@@ -61,10 +60,10 @@ export class LogStore extends LogStorageBase {
    * 在数据库中设置或更新一个日志摘要及其时间戳。
    * @param {string} digest - 日志内容的摘要字符串。
    * @param {number} timestamp - 日志的时间戳。
-   * @returns {Promise<string>} 解析为摘要键的 Promise。
+   * @returns {Promise<void>}
    */
   async setDigest(digest, timestamp) {
-    return this.lsPut(STORE_DIGEST, { digest, timestamp });
+    await this.lsPut(STORE_DIGEST, { digest, timestamp });
   }
 
   /**
@@ -90,10 +89,10 @@ export class LogStore extends LogStorageBase {
    * 在数据库中设置或更新一个元数据键值对。
    * @param {string} key - 元数据的键。
    * @param {*} value - 要存储的元数据值（将被编码为二进制）。
-   * @returns {Promise<string>} 解析为元数据键的 Promise。
+   * @returns {Promise<void>}
    */
   async setMeta(key, value) {
-    return this.lsPut(STORE_META, value, key);
+    await this.lsPut(STORE_META, value, key);
   }
 
   /**
