@@ -87,7 +87,7 @@ class ConsoleLogger {
   setLevel(level) {
     if(LEVELS[level] === undefined) return;
     this._currentLevel = LEVELS[level];
-    this._storage.setItem(ConsoleLogger.DEFAULT_LEVEL_KEY, this._currentLevel);
+    this._storage.setItem(ConsoleLogger.DEFAULT_LEVEL_KEY, String(this._currentLevel));
     this._rebuildMethods();
   }
 

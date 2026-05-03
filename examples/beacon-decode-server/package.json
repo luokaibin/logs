@@ -1,0 +1,13 @@
+{
+  "name": "beacon-decode-server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "最小 beacon 接收端：decodeLogs 解码后将 JSON.stringify 结果追加写入单文件",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@logbeacon/ingest": "workspace:*"
+  }
+}

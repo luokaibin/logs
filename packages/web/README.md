@@ -217,7 +217,7 @@ export default function RootLayout({ children }) {
 
 ```javascript
 // src/app/api/beacon/route.ts (App Router) 或 pages/api/beacon.ts (Pages Router)
-import { createLogClient } from 'logs/sls';
+import { createLogClient } from '@logbeacon/ingest/sls';
 
 const slsClient = createLogClient(
   'ap-southeast-1.log.aliyuncs.com',  // 服务入口
@@ -238,7 +238,7 @@ export async function POST(request) {
 
 ```javascript
 // src/app/api/beacon/route.ts (App Router) 或 pages/api/beacon.ts (Pages Router)
-import { createLogClient } from 'logs/loki';
+import { createLogClient } from '@logbeacon/ingest/loki';
 
 const lokiClient = createLogClient(
   'https://logs-prod-xxx.grafana.net',  // Loki 服务地址
@@ -260,7 +260,7 @@ export async function POST(request) {
 ```typescript
 // src/app/api/beacon/route.ts
 import { NextRequest } from 'next/server';
-import { createLogClient } from 'logs/loki';
+import { createLogClient } from '@logbeacon/ingest/loki';
 
 // 创建 Loki 日志客户端
 const lokiClient = createLogClient(
@@ -337,26 +337,25 @@ export default function Logger() {
 ### 模块结构
 
 ```
-logs/
-├── browser/        # 浏览器端专用模块
-│   ├── beacon.js       # 日志发送客户端 (Client)
-│   └── beacon-sw.js    # 日志处理 Service Worker
-├── common/         # 公共工具和组件
-│   ├── LogAggregator.js  # 日志聚合器
-│   ├── LogProcessor.js   # 日志处理器 (去重、过滤)
-│   ├── LogStore.js       # 日志持久化 (IndexedDB)
-│   └── utils.js          # 工具函数
-├── core/           # 核心日志模块 (isomorphic)
-│   └── logs.js         # 日志主入口
-├── sls/            # 阿里云日志服务 (SLS) 集成
-│   ├── logEncoder.js   # SLS 日志格式编码器
-│   └── slsClient.js    # SLS 服务端客户端
-├── loki/           # Grafana Loki 集成
-│   ├── logEncoder.js   # Loki 日志格式编码器
-│   └── lokiClient.js   # Loki 服务端客户端
-├── types/          # TypeScript 类型定义
-└── eslint/         # ESLint 插件
-    └── index.js    # 用于检测和转换 console 调用
+packages/web/              # 浏览器 beacon、核心 logs 入口
+├── browser/
+│   ├── beacon.js
+│   └── beacon-sw.js
+├── common/
+├── core/
+│   └── logs.js
+├── types/
+└── eslint/
+
+packages/platforms/      # SLS/Loki 适配源码
+├── sls/
+│   ├── logEncoder.js
+│   └── slsClient.js
+└── loki/
+    ├── logEncoder.js
+    └── lokiClient.js
+
+packages/ingest/dist/    # 由 platforms 的 *Client 打包的 Node 投递产物（@logbeacon/ingest）
 ```
 
 ### 客户端架构

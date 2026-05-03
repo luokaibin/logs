@@ -1,0 +1,40 @@
+{
+  "name": "@logbeacon/ingest",
+  "version": "1.7.2",
+  "type": "module",
+  "description": "服务端向 SLS / Loki 投递日志的客户端（由 platforms 源码打包，原 @logbeacon/web 的 slsClient / lokiClient）",
+  "exports": {
+    "./sls": {
+      "import": "./dist/sls/slsClient.js",
+      "require": "./dist/sls/slsClient.cjs",
+      "types": "./dist/types/slsClient.d.ts",
+      "default": "./dist/sls/slsClient.js"
+    },
+    "./loki": {
+      "import": "./dist/loki/lokiClient.js",
+      "require": "./dist/loki/lokiClient.cjs",
+      "types": "./dist/types/lokiClient.d.ts",
+      "default": "./dist/loki/lokiClient.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "rollup -c rollup.config.js",
+    "dev": "rollup -c rollup.config.js -w",
+    "clean": "rm -rf dist"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luokaibin/logs.git",
+    "directory": "packages/ingest"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^24.0.0",
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "rollup": "^3.20.0"
+  }
+}

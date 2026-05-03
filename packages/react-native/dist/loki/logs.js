@@ -87,7 +87,7 @@ class ConsoleLogger {
   setLevel(level) {
     if(LEVELS[level] === undefined) return;
     this._currentLevel = LEVELS[level];
-    this._storage.setItem(ConsoleLogger.DEFAULT_LEVEL_KEY, this._currentLevel);
+    this._storage.setItem(ConsoleLogger.DEFAULT_LEVEL_KEY, String(this._currentLevel));
     this._rebuildMethods();
   }
 
@@ -3281,7 +3281,16 @@ const MixinLogStore = (BaseClass) => {
     async lsAdd(storeName, value) {
       if (storeName === STORE_LOGS) {
         const blob = this.encodeLog(value);
-        DB.execute(`INSERT INTO ${STORE_LOGS} (value) VALUES (?);`, [blob]);
+        // pbf.finish() 返回 Uint8Array（常为 subarray）；quick-sqlite JSI 仅识别 ArrayBuffer，
+        // 否则占位符被绑成 NULL → NOT NULL constraint failed: b_dat.value
+        const buffer =
+          blob.buffer instanceof ArrayBuffer
+            ? blob.buffer.slice(
+                blob.byteOffset,
+                blob.byteOffset + blob.byteLength,
+              )
+            : new Uint8Array(blob).buffer;
+        DB.execute(`INSERT INTO ${STORE_LOGS} (value) VALUES (?);`, [buffer]);
         return {
           size: blob.byteLength,
         };
@@ -3624,6 +3633,14 @@ function setBeaconUrl(beaconUrl) {
   });
 }
 
+/**
+ * 立即触发上报（与 Web 端 `logbeacon:flush` → `flush-now` 一致）。
+ * @returns {Promise<void>}
+ */
+function requestFlush() {
+  return enqueueMessage({ type: "flush-now" });
+}
+
 
 const log = new ConsoleLogger({
   storage: localStorage,
@@ -3637,5 +3654,5 @@ if (g) {
   g[LOG_BEACON_GLOBAL_KEY] = log;
 }
 
-export { log as default, setBeaconUrl };
+export { log as default, requestFlush, setBeaconUrl };
 //# sourceMappingURL=logs.js.map

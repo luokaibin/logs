@@ -51,6 +51,11 @@ export declare const LOG_BEACON_GLOBAL_KEY: string;
  */
 export declare function setBeaconUrl(beaconUrl: string): Promise<void>;
 
+/**
+ * 立即触发上报（与 Web `logbeacon:flush` 对齐）。
+ */
+export declare function requestFlush(): Promise<void>;
+
 declare const log: EnhancedLogger;
 
 export default log;

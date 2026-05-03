@@ -1,14 +1,8 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import terser from '@rollup/plugin-terser';
 // import obfuscator from 'rollup-plugin-obfuscator';
 import copyTypes from './rollup-plugin-copy-types.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-/** `rollup` 入口直接指向 platforms 包内文件（非 `@logbeacon/platforms/*` 解析） */
-const platformsDir = path.resolve(__dirname, '../platforms');
 
 const WEB_CORE_LOG_AGGREGATOR_PLACEHOLDER =
   'logbeacon-internal:core-log-aggregator';
@@ -165,40 +159,6 @@ export default [
       propertyReadSideEffects: false    // 假设属性读取没有副作用
     }
   },
-  // 服务端（入口直接使用 platforms，省略 packages/web/sls 薄封装）
-  {
-    input: path.join(platformsDir, 'sls/slsClient.js'),
-    output: [
-      {
-        ...outputConfig,
-        file: `dist/sls/slsClient.js`,
-        format: 'esm',
-        sourcemap: true
-      },
-      {
-        ...outputConfig,
-        file: `dist/sls/slsClient.cjs`,
-        format: 'cjs',
-        sourcemap: true
-      },
-    ],
-    plugins: [
-      resolve({
-        browser: false, // 优先使用为浏览器环境准备的模块
-        preferBuiltins: true // 不优先使用 Node.js 内置模块
-      }),
-      commonjsPlugin,
-      terserPlugin,
-      // 复制 slsClient 类型定义文件到 dist 目录
-      copyTypes({
-        targets: [
-          { src: 'types/slsClient.d.ts', dest: 'dist/types/slsClient.d.ts' }
-        ]
-      }),
-    ],
-    // 外部依赖配置，这些依赖不会被打包进最终文件，而是在运行时加载
-    // external: ['loglevel', 'ua-parser-js', 'fflate', 'pbf']
-  },
   {
     input: 'browser/beacon-sw.js',
     output: {
@@ -241,39 +201,6 @@ export default [
       moduleSideEffects: false,         // 假设模块没有副作用
       propertyReadSideEffects: false    // 假设属性读取没有副作用
     }
-  },
-  {
-    input: path.join(platformsDir, 'loki/lokiClient.js'),
-    output: [
-      {
-        ...outputConfig,
-        file: `dist/loki/lokiClient.js`,
-        format: 'esm',
-        sourcemap: true
-      },
-      {
-        ...outputConfig,
-        file: `dist/loki/lokiClient.cjs`,
-        format: 'cjs',
-        sourcemap: true
-      },
-    ],
-    plugins: [
-      resolve({
-        browser: false, // 优先使用为浏览器环境准备的模块
-        preferBuiltins: true // 不优先使用 Node.js 内置模块
-      }),
-      commonjsPlugin,
-      terserPlugin,
-      // 复制 slsClient 类型定义文件到 dist 目录
-      copyTypes({
-        targets: [
-          { src: 'types/lokiClient.d.ts', dest: 'dist/types/lokiClient.d.ts' }
-        ]
-      }),
-    ],
-    // 外部依赖配置，这些依赖不会被打包进最终文件，而是在运行时加载
-    // external: ['loglevel', 'ua-parser-js', 'fflate', 'pbf']
   },
   // ESLint插件
   {

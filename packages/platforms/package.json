@@ -2,7 +2,7 @@
   "name": "@logbeacon/platforms",
   "version": "1.7.2",
   "type": "module",
-  "description": "受支持日志平台的适配实现：阿里云 SLS、Grafana Loki 等编码与客户端（与 @logbeacon/core 编排层解耦）。",
+  "description": "受支持日志平台的适配实现：阿里云 SLS、Grafana Loki 等编码与客户端源码（与 @logbeacon/core 编排层解耦）；Node 投递产物见 @logbeacon/ingest。",
   "exports": {
     "./sls-encoder": "./sls/logEncoder.js",
     "./sls-client": "./sls/slsClient.js",

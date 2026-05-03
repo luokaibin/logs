@@ -3,6 +3,11 @@
 node_modules/*
 .next
 */**/node_modules/*
+# 任意子包/示例下的 node_modules（pnpm 本地 link 等）
+**/node_modules/
+
 example/*
 .vercel
 .pnpm-store
+
+.DS_Store

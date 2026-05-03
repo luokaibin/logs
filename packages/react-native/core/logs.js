@@ -20,6 +20,14 @@ export function setBeaconUrl(beaconUrl) {
   });
 }
 
+/**
+ * 立即触发上报（与 Web 端 `logbeacon:flush` → `flush-now` 一致）。
+ * @returns {Promise<void>}
+ */
+export function requestFlush() {
+  return enqueueMessage({ type: "flush-now" });
+}
+
 
 const log = new ConsoleLogger({
   storage: localStorage,

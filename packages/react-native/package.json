@@ -2,7 +2,9 @@
   "name": "@logbeacon/react-native",
   "version": "1.7.2",
   "type": "module",
+  "main": "./dist/sls/logs.js",
   "module": "./dist/sls/logs.js",
+  "react-native": "./dist/sls/logs.js",
   "description": "React Native 日志采集与上报（阿里云 SLS / Grafana Loki），入口与 Web core/logs 对齐并按变体分包",
   "exports": {
     ".": {
@@ -68,13 +70,13 @@
   "homepage": "https://github.com/luokaibin/logs#readme",
   "license": "MIT",
   "peerDependencies": {
-    "react-native": ">=0.64.0"
+    "react-native": ">=0.64.0",
+    "react-native-quick-sqlite": ">=8.2.7"
   },
   "dependencies": {
     "@logbeacon/core": "workspace:*",
     "fflate": "^0.8.2",
-    "pbf": "^4.0.1",
-    "react-native-quick-sqlite": "^8.2.7"
+    "pbf": "^4.0.1"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^24.0.0",

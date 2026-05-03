@@ -4,8 +4,8 @@
   "private": true,
   "description": "浏览器端日志上报",
   "scripts": {
-    "build": "turbo run build --filter=@logbeacon/core --filter=logbeacon",
-    "dev": "turbo run dev --filter=@logbeacon/core --filter=logbeacon --filter=next-log-test",
+    "build": "turbo run build --filter=@logbeacon/core --filter=@logbeacon/web --filter=@logbeacon/ingest",
+    "dev": "turbo run dev --filter=@logbeacon/core --filter=@logbeacon/web --filter=next-log-test",
     "test": "pnpm -r test",
     "clean": "pnpm -r clean"
   },

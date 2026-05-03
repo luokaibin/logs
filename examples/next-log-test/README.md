@@ -5,7 +5,7 @@
 ## 前置条件
 
 1. 已安装依赖：`pnpm install`（在 monorepo 根目录）
-2. 已构建浏览器包：`pnpm --filter logbeacon build`  
+2. 已构建浏览器包：`pnpm --filter @logbeacon/web build`  
    会生成 `packages/web/dist/sls/beacon.js` 与 `beacon-sw.js`。
 
 ## 开发与访问

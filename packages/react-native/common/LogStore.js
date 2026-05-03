@@ -129,7 +129,16 @@ export const MixinLogStore = (BaseClass) => {
     async lsAdd(storeName, value) {
       if (storeName === STORE_LOGS) {
         const blob = this.encodeLog(value);
-        DB.execute(`INSERT INTO ${STORE_LOGS} (value) VALUES (?);`, [blob]);
+        // pbf.finish() 返回 Uint8Array（常为 subarray）；quick-sqlite JSI 仅识别 ArrayBuffer，
+        // 否则占位符被绑成 NULL → NOT NULL constraint failed: b_dat.value
+        const buffer =
+          blob.buffer instanceof ArrayBuffer
+            ? blob.buffer.slice(
+                blob.byteOffset,
+                blob.byteOffset + blob.byteLength,
+              )
+            : new Uint8Array(blob).buffer;
+        DB.execute(`INSERT INTO ${STORE_LOGS} (value) VALUES (?);`, [buffer]);
         return {
           size: blob.byteLength,
         };

@@ -11,12 +11,6 @@
         "types": "./dist/types/logs.d.ts",
         "default": "./dist/core/logs.js"
       },
-      "./sls": {
-        "import": "./dist/sls/slsClient.js",
-        "require": "./dist/sls/slsClient.cjs",
-        "default": "./dist/sls/slsClient.js",
-        "types": "./dist/types/slsClient.d.ts"
-      },
       "./sls/beacon": {
         "import": "./dist/sls/beacon.js",
         "default": "./dist/sls/beacon.js"
@@ -24,12 +18,6 @@
       "./sls/sw": {
         "import": "./dist/sls/beacon-sw.js",
         "default": "./dist/sls/beacon-sw.js"
-      },
-      "./loki": {
-        "import": "./dist/loki/lokiClient.js",
-        "require": "./dist/loki/lokiClient.cjs",
-        "default": "./dist/loki/lokiClient.js",
-        "types": "./dist/types/lokiClient.d.ts"
       },
       "./loki/beacon": {
         "import": "./dist/loki/beacon.js",
