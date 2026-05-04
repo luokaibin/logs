@@ -21,10 +21,10 @@ import {
 
 import log, {requestFlush, setBeaconUrl} from '@logbeacon/react-native';
 
-log.setLevel("SILENT")
+log.setLevel("TRACE")
 
 function defaultBeaconUrl(): string {
-  const host = Platform.OS === 'android' ? 'http://localhost:3101' : 'http://localhost:3100';
+  const host = Platform.OS === 'android' ? 'http://192.168.1.79:3101' : 'http://localhost:3100';
   return `${host}/api/beacon`;
 }
 

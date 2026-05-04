@@ -129,16 +129,20 @@ export const MixinLogStore = (BaseClass) => {
     async lsAdd(storeName, value) {
       if (storeName === STORE_LOGS) {
         const blob = this.encodeLog(value);
-        // pbf.finish() 返回 Uint8Array（常为 subarray）；quick-sqlite JSI 仅识别 ArrayBuffer，
-        // 否则占位符被绑成 NULL → NOT NULL constraint failed: b_dat.value
-        const buffer =
-          blob.buffer instanceof ArrayBuffer
-            ? blob.buffer.slice(
-                blob.byteOffset,
-                blob.byteOffset + blob.byteLength,
-              )
-            : new Uint8Array(blob).buffer;
-        console.log("写入 buffer", buffer, buffer.byteLength);
+        // 必须得到「长度 = 负载字节数」的独立 ArrayBuffer，再交给 JSI：
+        // 1) `new Uint8Array(blob).buffer` 的 backing 可能比 byteLength 大（对齐），native 若按 buffer 全长绑 BLOB 会写入脏尾或堆异常；
+        // 2) 无 `console.log(buffer)` 时偶发闪退、加上就正常，属于「延长引用/改变 GC 时机」掩盖了上述生命周期问题，不能依赖 console。
+        // const buffer =
+        //   blob.byteLength === 0
+        //     ? new ArrayBuffer(0)
+        //     : blob.buffer instanceof ArrayBuffer
+        //       ? blob.buffer.slice(
+        //           blob.byteOffset,
+        //           blob.byteOffset + blob.byteLength,
+        //         )
+        //       : new Uint8Array(blob).buffer.slice(0, blob.byteLength);
+        const buffer = new Uint8Array(blob).buffer.slice(0, blob.byteLength);
+        console.log("写入 buffer", buffer);
         DB.execute(`INSERT INTO ${STORE_LOGS} (value) VALUES (?);`, [buffer]);
         return {
           size: blob.byteLength,

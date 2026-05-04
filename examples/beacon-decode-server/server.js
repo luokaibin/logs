@@ -8,7 +8,8 @@ import { decodeLogs as decodeLoki } from '@logbeacon/ingest/loki';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** 与客户端 beacon 变体一致：`sls`（默认）或 `loki` */
-const backend = process.env.BEACON_BACKEND === 'loki' ? 'loki' : 'sls';
+// const backend = process.env.BEACON_BACKEND === 'loki' ? 'loki' : 'sls';
+const backend = 'sls';
 /** 解码结果追加写入的路径（每请求一行 JSON.stringify，无缩进） */
 const outputFile =
   process.env.DECODE_OUTPUT_FILE ?? path.join(__dirname, 'decoded-output.ndjson');
@@ -20,6 +21,11 @@ function decodeBody(payload) {
 
 const server = http.createServer(async (req, res) => {
   const url = req.url ?? '';
+  /** 手机浏览器可开 `GET http://<电脑局域网IP>:<port>/api/beacon/health` 验证 TCP/明文是否通 */
+  if (req.method === 'GET' && url.startsWith('/api/beacon/health')) {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }).end('ok');
+    return;
+  }
   if (req.method !== 'POST' || !url.startsWith('/api/beacon')) {
     res.writeHead(404).end();
     return;
@@ -42,8 +48,11 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, () => {
+server.listen(port, '0.0.0.0', () => {
   console.log(
-    `[beacon-decode-server] http://127.0.0.1:${port}/api/beacon | backend=${backend} | out=${outputFile}`,
+    `[beacon-decode-server] listen 0.0.0.0:${port} | POST /api/beacon | GET /api/beacon/health | backend=${backend} | out=${outputFile}`,
+  );
+  console.log(
+    `[beacon-decode-server] 本机自测: curl -sS http://127.0.0.1:${port}/api/beacon/health`,
   );
 });
