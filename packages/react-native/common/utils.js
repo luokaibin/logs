@@ -45,7 +45,7 @@ export function getLogExtraInfo() {
   const orientation = width >= height ? "landscape" : "portrait";
   return {
     ...extraInfo,
-    window: JSON.stringify({ width, height, orientation }),
+    window: JSON.stringify({ width: width.toFixed(0), height: height.toFixed(0), orientation }),
     orientation,
     clientUuid: readClientUUID(),
     sessionId: getOrCreateSessionId.call(sessionStorage),

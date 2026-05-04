@@ -1260,7 +1260,6 @@ class LogProcessor extends LogStore {
   async insertLog(logItem) {
     if (!logItem.content) return null;
     let log = await this.dedupLog(logItem);
-    console.log('添加日志', log);
     if (!log) return null;
     log = await this.completeLog(log);
     const {size = 0} = await super.insertLog(log);
@@ -1506,7 +1505,7 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
   async _loadAndDecodeLogsFromDB() {
     const logsBytes = await this.getAllLogsBytes();
     const logs = await this.getAllLogs();
-    console.log('从DB加载并解码所有日志', logs, logsBytes);
+    console.log('从DB加载并解码所有日志', logs.length);
     return {logs, logsBytes};
   }
   /**
@@ -1576,13 +1575,13 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
   async flushLogs() {
     const {logs: logBuffer} = await this._loadAndDecodeLogsFromDB();
     if (!logBuffer || logBuffer.length === 0) return;
-    const ctxId = await this?._generateLogContext?.();
-    console.log('ctxId', ctxId, logBuffer);
+    await this?._generateLogContext?.();
     const payload = logEncoder(logBuffer);
     if (!payload) return;
     const body = this._compressLogs(payload);
     const beaconUrl = await this._getBeaconUrl();
     try {
+      console.log('日志上报', beaconUrl);
       await fetch(beaconUrl, {
         method: 'POST',
         body,

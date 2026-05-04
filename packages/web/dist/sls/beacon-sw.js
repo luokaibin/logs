@@ -1260,7 +1260,6 @@ class LogProcessor extends LogStore {
   async insertLog(logItem) {
     if (!logItem.content) return null;
     let log = await this.dedupLog(logItem);
-    console.log('添加日志', log);
     if (!log) return null;
     log = await this.completeLog(log);
     const {size = 0} = await super.insertLog(log);
@@ -2210,7 +2209,6 @@ function logEncoder(logs, ctxId) {
     LogTags: LogTags
   };
   if (!payload.Logs?.length) return;
-  console.log('格式化完成 payload', payload);
   // 创建并编码日志组
   const pbf = new Pbf$1();
   writeLogGroup(payload, pbf);
@@ -2384,7 +2382,7 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
   async _loadAndDecodeLogsFromDB() {
     const logsBytes = await this.getAllLogsBytes();
     const logs = await this.getAllLogs();
-    console.log('从DB加载并解码所有日志', logs, logsBytes);
+    console.log('从DB加载并解码所有日志', logs.length);
     return {logs, logsBytes};
   }
   /**
@@ -2455,12 +2453,12 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
     const {logs: logBuffer} = await this._loadAndDecodeLogsFromDB();
     if (!logBuffer || logBuffer.length === 0) return;
     const ctxId = await this?._generateLogContext?.();
-    console.log('ctxId', ctxId, logBuffer);
     const payload = logEncoder(logBuffer, ctxId);
     if (!payload) return;
     const body = this._compressLogs(payload);
     const beaconUrl = await this._getBeaconUrl();
     try {
+      console.log('日志上报', beaconUrl);
       await fetch(beaconUrl, {
         method: 'POST',
         body,

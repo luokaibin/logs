@@ -62,7 +62,6 @@ export default function logEncoder(logs, ctxId) {
     LogTags: LogTags
   };
   if (!payload.Logs?.length) return;
-  console.log('格式化完成 payload', payload);
   // 创建并编码日志组
   const pbf = new Pbf();
   writeLogGroup(payload, pbf);

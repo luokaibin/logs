@@ -21,6 +21,8 @@ import {
 
 import log, {requestFlush, setBeaconUrl} from '@logbeacon/react-native';
 
+log.setLevel("SILENT")
+
 function defaultBeaconUrl(): string {
   const host = Platform.OS === 'android' ? 'http://localhost:3101' : 'http://localhost:3100';
   return `${host}/api/beacon`;
@@ -34,7 +36,7 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     // 默认级别为 WARN，不放开则 info / debug 不会进入上报链路。
     // ConsoleLogger 运行时使用大写键（与类型里的 'trace' 等小写声明不一致）。
-    (log as {setLevel: (level: string) => void}).setLevel('TRACE');
+    // (log as {setLevel: (level: string) => void}).setLevel('TRACE');
     const initial = defaultBeaconUrl();
     void setBeaconUrl(initial).then(() => {
       setStatus(`已设置 beacon: ${initial}`);
@@ -60,7 +62,8 @@ export default function App(): React.JSX.Element {
   }, []);
 
   const onSendError = useCallback(() => {
-    log.error(new Error('RN 示例：测试 error 级别'));
+    const error = new Error('RN 示例：测试 error 级别');
+    log.error(error);
   }, []);
 
   const onDedupPair = useCallback(() => {

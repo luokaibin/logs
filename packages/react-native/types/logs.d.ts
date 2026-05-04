@@ -13,12 +13,12 @@ export interface EnhancedLogger {
   getLevel(): number;
   setLevel(
     level:
-      | 'trace'
-      | 'debug'
-      | 'info'
-      | 'warn'
-      | 'error'
-      | 'silent'
+      | 'TRACE'
+      | 'DEBUG'
+      | 'INFO'
+      | 'WARN'
+      | 'ERROR'
+      | 'SILENT'
       | number,
     persist?: boolean
   ): void;

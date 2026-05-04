@@ -138,6 +138,7 @@ export const MixinLogStore = (BaseClass) => {
                 blob.byteOffset + blob.byteLength,
               )
             : new Uint8Array(blob).buffer;
+        console.log("写入 buffer", buffer, buffer.byteLength);
         DB.execute(`INSERT INTO ${STORE_LOGS} (value) VALUES (?);`, [buffer]);
         return {
           size: blob.byteLength,
@@ -297,7 +298,7 @@ export const MixinLogStore = (BaseClass) => {
      */
     decodeLog(log) {
       let bytes = log;
-      if (log != null && typeof log === 'object') {
+      if (log != null && typeof log === "object") {
         const isBinary =
           log instanceof ArrayBuffer || ArrayBuffer.isView(log);
         if (!isBinary) {

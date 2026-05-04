@@ -171,7 +171,7 @@ export class LogAggregator extends LogProcessor {
   async _loadAndDecodeLogsFromDB() {
     const logsBytes = await this.getAllLogsBytes();
     const logs = await this.getAllLogs();
-    console.log('从DB加载并解码所有日志', logs, logsBytes);
+    console.log('从DB加载并解码所有日志', logs.length);
     return {logs, logsBytes};
   }
   /**
@@ -242,12 +242,12 @@ export class LogAggregator extends LogProcessor {
     const {logs: logBuffer} = await this._loadAndDecodeLogsFromDB();
     if (!logBuffer || logBuffer.length === 0) return;
     const ctxId = await this?._generateLogContext?.();
-    console.log('ctxId', ctxId, logBuffer);
     const payload = logEncoder(logBuffer, ctxId);
     if (!payload) return;
     const body = this._compressLogs(payload);
     const beaconUrl = await this._getBeaconUrl();
     try {
+      console.log('日志上报', beaconUrl);
       await fetch(beaconUrl, {
         method: 'POST',
         body,

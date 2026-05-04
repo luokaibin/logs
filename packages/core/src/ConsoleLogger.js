@@ -15,6 +15,7 @@ const DEFAULT_KEYWORDS_KEY = "_logFilterKeyWords";
 
 /**
  * 基于 console 的分级日志；level / 关键词的持久化通过外部传入的 storage 完成。
+ * `forwardLog` 与 level 无关：凡调用 trace/debug/info/warn/error 都会触发；level 仅约束是否输出到 console。
  *
  * @typedef {{ setItem(key: string, value: string): void, getItem(key: string): string | null }} LogStorage
  */
@@ -134,11 +135,11 @@ export class ConsoleLogger {
   }
 
   _rebuildMethods() {
-    this.trace = this._shouldLog("trace") ? (...args) => this._emit("trace", args) : this._noop;
-    this.debug = this._shouldLog("log") ? (...args) => this._emit("log", args) : this._noop;
-    this.info = this._shouldLog("info") ? (...args) => this._emit("info", args) : this._noop;
-    this.warn = this._shouldLog("warn") ? (...args) => this._emit("warn", args) : this._noop;
-    this.error = this._shouldLog("error") ? (...args) => this._emit("error", args) : this._noop;
+    this.trace = (...args) => this._emit("trace", args);
+    this.debug = (...args) => this._emit("log", args);
+    this.info = (...args) => this._emit("info", args);
+    this.warn = (...args) => this._emit("warn", args);
+    this.error = (...args) => this._emit("error", args);
   }
 
   /**
@@ -146,11 +147,14 @@ export class ConsoleLogger {
    * @param {unknown[]} args
    */
   _emit(fnName, args) {
-    const bound = this._boundConsole[fnName];
-    if (typeof bound !== "function") return;
     if (this._forwardLog) {
       this._forwardLog(fnName === "log" ? "debug" : fnName, args);
     }
+    if (!this._shouldLog(fnName)) {
+      return;
+    }
+    const bound = this._boundConsole[fnName];
+    if (typeof bound !== "function") return;
     if (typeof args[0] !== "string") {
       bound(...args);
       return;

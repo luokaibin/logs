@@ -11,3 +11,8 @@ example/*
 .pnpm-store
 
 .DS_Store
+packages/react-native/dist/*
+packages/core/lib/*
+packages/web/dist/core/*
+packages/web/dist/eslint/*
+packages/web/dist/dev-tools/*
