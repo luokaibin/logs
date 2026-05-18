@@ -4,8 +4,16 @@ const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, '../..');
 const packagesRoot = path.resolve(monorepoRoot, 'packages');
+const logbeaconRnRoot = path.resolve(packagesRoot, 'react-native');
 /** 仅用于 watch：pnpm 真实文件在 .pnpm 下，需允许 Metro 读盘 */
 const workspaceNodeModules = path.resolve(monorepoRoot, 'node_modules');
+
+/** Metro 对 package.json exports 子路径支持不完整，显式映射 SLS/Loki 构建产物 */
+const logbeaconEntryFiles = {
+  '@logbeacon/react-native': path.join(logbeaconRnRoot, 'dist/sls/logs.js'),
+  '@logbeacon/react-native/sls': path.join(logbeaconRnRoot, 'dist/sls/logs.js'),
+  '@logbeacon/react-native/loki': path.join(logbeaconRnRoot, 'dist/loki/logs.js'),
+};
 
 const babelRuntimeRoot = path.dirname(
   require.resolve('@babel/runtime/package.json', {paths: [projectRoot]}),
@@ -45,6 +53,9 @@ module.exports = mergeConfig(getDefaultConfig(projectRoot), {
       react: reactRoot,
     },
     resolveRequest(context, moduleName, platform) {
+      if (logbeaconEntryFiles[moduleName]) {
+        return {type: 'sourceFile', filePath: logbeaconEntryFiles[moduleName]};
+      }
       if (
         moduleName === '@babel/runtime' ||
         moduleName.startsWith('@babel/runtime/')

@@ -4,13 +4,15 @@ import { writeLogGroup } from './sls';
 /**
  * 将日志数组序列化为 protobuf 格式
  * @param {Array} logs - 日志数组
- * @param {string} ctxId - 日志上下文ID
+ * @param {string|{ ctxId?: string }} context - 日志上下文 ID 或 EncoderContext
  * @returns {Uint8Array|undefined} - 序列化后的二进制数据
  */
-export default function logEncoder(logs, ctxId) {
+export default function logEncoder(logs, context) {
   if (!Array.isArray(logs)) {
     throw new Error('logs must be array!')
   }
+
+  const ctxId = typeof context === 'string' ? context : context?.ctxId;
 
   const LogTags = [];
   

@@ -1,3 +1,5 @@
+import { BACKEND } from 'logbeacon-internal:backend';
+
 /**
  * Web Storage 形态的内存实现（无 localStorage 等持久化层时使用）。
  * @returns {{ setItem(key: string, value: string): void, getItem(key: string): string | null }}
@@ -4168,6 +4170,20 @@ const MixinLogStore = (BaseClass) => {
         cursor = await cursor.continue();
       }
       await tx.done;
+    }
+
+    /**
+     * @returns {Promise<{ ctxId: string, streamLabels: Record<string, string> }>}
+     */
+    async buildEncoderContext() {
+      if (BACKEND === 'loki') {
+        return {
+          streamLabels: {
+            host: globalThis.location.hostname,
+          },
+        };
+      }
+      return super.buildEncoderContext();
     }
 
     /**

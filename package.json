@@ -6,6 +6,7 @@
   "scripts": {
     "build": "turbo run build --filter=@logbeacon/core --filter=@logbeacon/web --filter=@logbeacon/ingest",
     "dev": "turbo run dev --filter=@logbeacon/core --filter=@logbeacon/web --filter=next-log-test",
+    "dev:rn": "pnpm --filter @logbeacon/react-native build && pnpm --filter rn-log-test start",
     "test": "pnpm -r test",
     "clean": "pnpm -r clean"
   },

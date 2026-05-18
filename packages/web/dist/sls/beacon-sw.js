@@ -2151,13 +2151,15 @@ function writeLogGroup(obj, pbf) {
 /**
  * 将日志数组序列化为 protobuf 格式
  * @param {Array} logs - 日志数组
- * @param {string} ctxId - 日志上下文ID
+ * @param {string|{ ctxId?: string }} context - 日志上下文 ID 或 EncoderContext
  * @returns {Uint8Array|undefined} - 序列化后的二进制数据
  */
-function logEncoder(logs, ctxId) {
+function logEncoder(logs, context) {
   if (!Array.isArray(logs)) {
     throw new Error('logs must be array!')
   }
+
+  const ctxId = typeof context === 'string' ? context : context?.ctxId;
 
   const LogTags = [];
   
@@ -2235,6 +2237,12 @@ function logEncoder(logs, ctxId) {
  * @property {string} ip - 公网IP
  * @property {string} region - 公网IP所在地区
  * @property {Object.<string, string>} [extendedAttributes] - 外部扩展的基础属性，key-value均为字符串
+ */
+
+/**
+ * @typedef {Object} EncoderContext
+ * @property {string} ctxId - 日志批次上下文 ID
+ * @property {Record<string, string>} [streamLabels] - Loki stream 标签（由平台 mixin 组装）
  */
 
 /**
@@ -2445,14 +2453,22 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
   }
   
   /**
+   * 组装编码器上下文（ctxId 由 core 生成；streamLabels 由平台 mixin 补充）
+   * @returns {Promise<EncoderContext>}
+   */
+  async buildEncoderContext() {
+    return { ctxId: await this._generateLogContext() };
+  }
+
+  /**
    * 压缩并发送日志
    * @returns {Promise<void>}
    */
   async flushLogs() {
     const {logs: logBuffer} = await this._loadAndDecodeLogsFromDB();
     if (!logBuffer || logBuffer.length === 0) return;
-    const ctxId = await this?._generateLogContext?.();
-    const payload = logEncoder(logBuffer, ctxId);
+    const encoderContext = await this.buildEncoderContext();
+    const payload = logEncoder(logBuffer, encoderContext);
     if (!payload) return;
     const body = this._compressLogs(payload);
     const beaconUrl = await this._getBeaconUrl();
@@ -3997,6 +4013,13 @@ const MixinLogStore = (BaseClass) => {
         cursor = await cursor.continue();
       }
       await tx.done;
+    }
+
+    /**
+     * @returns {Promise<{ ctxId: string, streamLabels: Record<string, string> }>}
+     */
+    async buildEncoderContext() {
+      return super.buildEncoderContext();
     }
 
     /**

@@ -1,4 +1,23 @@
-# Logs
+# @logbeacon/react-native
+
+React Native 端日志采集与上报（SLS / Loki），本地持久化基于 `react-native-nitro-sqlite`。
+
+## 环境要求（React Native）
+
+| 依赖 | 版本 |
+|------|------|
+| `react` | ≥ 19.0.0 |
+| `react-native` | ≥ **0.78.0**（与 `react-native-nitro-modules` Android 编译要求对齐） |
+| `react-native-nitro-modules` | ≥ 0.35.0 |
+| `react-native-nitro-sqlite` | ≥ 9.0.0 |
+
+需启用 **New Architecture**。完整示例见仓库 `examples/rn-log-test`（当前 RN 0.78.3）。
+
+---
+
+以下为同仓库 Web 包说明（浏览器 beacon）；RN API 见 `types/logs.d.ts` 与 `examples/rn-log-test`。
+
+# Logs（Web）
 
 浏览器端日志采集与上报工具，支持多种日志服务后端，包括阿里云日志服务(SLS)和 Grafana Loki。通过客户端和服务端的配合，实现日志的无缝采集和传输。
 

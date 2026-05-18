@@ -1299,19 +1299,25 @@ class LogProcessor extends LogStore {
 /**
  * 将日志数组序列化为 Loki 格式
  * @param {Array} logs - 日志数组
- * @param {string} ctxId - 日志上下文ID
+ * @param {{ ctxId?: string, streamLabels?: Record<string, string> }} context - 编码上下文
  * @returns {Uint8Array|undefined} - 序列化后的 Loki 格式数据
  */
-function logEncoder(logs, ctxId) {
-    // 这里每条日志单独作为一条 value，上报到同一个 stream（可根据需要自定义标签）
-    const streamLabels = {
-      host: location.hostname,
-    };
-    
+function logEncoder(logs, context) {
+    const rawLabels = context?.streamLabels ?? {};
+    /** @type {Record<string, string>} */
+    const streamLabels = {};
+    for (const [key, value] of Object.entries(rawLabels)) {
+      if (!key || typeof value !== 'string' || !value.trim()) continue;
+      streamLabels[key] = value;
+    }
+    if (!Object.keys(streamLabels).length) {
+      throw new Error('Loki: streamLabels must contain at least one label');
+    }
+
     const values = logs.map(item => {
       // Loki 需要纳秒级时间戳字符串
       const ts = (item.time ? (item.time * 1e6) : (Date.now() * 1e6)).toString();
-      
+
       // 展开 extendedAttributes 到顶层
       const flattened = { ...item };
       if (item.extendedAttributes && typeof item.extendedAttributes === 'object') {
@@ -1358,6 +1364,12 @@ function logEncoder(logs, ctxId) {
  * @property {string} ip - 公网IP
  * @property {string} region - 公网IP所在地区
  * @property {Object.<string, string>} [extendedAttributes] - 外部扩展的基础属性，key-value均为字符串
+ */
+
+/**
+ * @typedef {Object} EncoderContext
+ * @property {string} ctxId - 日志批次上下文 ID
+ * @property {Record<string, string>} [streamLabels] - Loki stream 标签（由平台 mixin 组装）
  */
 
 /**
@@ -1568,14 +1580,22 @@ let LogAggregator$1 = class LogAggregator extends LogProcessor {
   }
   
   /**
+   * 组装编码器上下文（ctxId 由 core 生成；streamLabels 由平台 mixin 补充）
+   * @returns {Promise<EncoderContext>}
+   */
+  async buildEncoderContext() {
+    return { ctxId: await this._generateLogContext() };
+  }
+
+  /**
    * 压缩并发送日志
    * @returns {Promise<void>}
    */
   async flushLogs() {
     const {logs: logBuffer} = await this._loadAndDecodeLogsFromDB();
     if (!logBuffer || logBuffer.length === 0) return;
-    await this?._generateLogContext?.();
-    const payload = logEncoder(logBuffer);
+    const encoderContext = await this.buildEncoderContext();
+    const payload = logEncoder(logBuffer, encoderContext);
     if (!payload) return;
     const body = this._compressLogs(payload);
     const beaconUrl = await this._getBeaconUrl();
@@ -3120,6 +3140,19 @@ const MixinLogStore = (BaseClass) => {
         cursor = await cursor.continue();
       }
       await tx.done;
+    }
+
+    /**
+     * @returns {Promise<{ ctxId: string, streamLabels: Record<string, string> }>}
+     */
+    async buildEncoderContext() {
+      {
+        return {
+          streamLabels: {
+            host: globalThis.location.hostname,
+          },
+        };
+      }
     }
 
     /**

@@ -26,6 +26,22 @@ function createRnCoreLogAggregatorPlaceholderPlugin(variant) {
   };
 }
 
+function createBackendConstantPlugin(variant) {
+  const VIRTUAL_ID = 'logbeacon-internal:backend';
+  const RESOLVED = '\0' + VIRTUAL_ID;
+  return {
+    name: `rn-backend-${variant}`,
+    resolveId(id) {
+      if (id === VIRTUAL_ID) return RESOLVED;
+    },
+    load(id) {
+      if (id === RESOLVED) {
+        return `export const BACKEND = ${JSON.stringify(variant)};`;
+      }
+    },
+  };
+}
+
 const resolvePlugin = resolve({
   browser: true,
   preferBuiltins: false,
@@ -45,7 +61,7 @@ const outputConfig = {
 };
 
 /** 宿主运行时提供，勿打进 bundle（RN 入口含 Flow，Rollup 无法解析）。 */
-const rnExternals = ['react-native', 'react-native-quick-sqlite'];
+const rnExternals = ['react-native', 'react-native-nitro-sqlite'];
 
 /**
  * @param {'sls' | 'loki'} variant
@@ -71,6 +87,7 @@ function createRnLogsEntryConfig(variant) {
     ],
     plugins: [
       createRnCoreLogAggregatorPlaceholderPlugin(variant),
+      createBackendConstantPlugin(variant),
       resolvePlugin,
       commonjsPlugin,
       ...(variant === 'sls'

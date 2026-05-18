@@ -1,18 +1,34 @@
 # React Native Logbeacon 示例
 
-在真机/模拟器上验证 `@logbeacon/react-native`：SQLite 缓冲、聚合、去重与上报；交互按钮与 `examples/next-log-test/app/page.tsx` 对齐（info / error / 去重 / burst / 手动 flush）。
+在真机/模拟器上验证 `@logbeacon/react-native`：nitro-sqlite 本地缓冲、聚合、去重与上报。交互按钮与 [`examples/next-log-test/app/page.tsx`](../next-log-test/app/page.tsx) 对齐（info / error / 去重 / burst / 手动 flush）。
+
+**默认变体**：`@logbeacon/react-native/loki`，联调 [`beacon-decode-server`](../beacon-decode-server)（`:3101`）。
 
 ## 前置条件
 
-1. 仓库根目录 `pnpm install`。若 pnpm 提示忽略依赖构建脚本，请对本仓库允许的包执行一次 `pnpm approve-builds`（否则 `react-native-quick-sqlite` 原生侧可能未正确安装）。
+1. 仓库根目录：
+
+   ```bash
+   pnpm install
+   ```
+
+   若 pnpm 提示忽略 native 构建脚本，执行 `pnpm approve-builds` 并允许 `react-native-nitro-modules`、`react-native-nitro-sqlite` 等。
+
+   本示例使用 **React Native 0.78.3**（与 `react-native-nitro-modules` 在 Android 上的最低推荐版本对齐，无需 patch）。
+
 2. 构建 RN 日志包（示例依赖其 `dist`）：
+
    ```bash
    pnpm --filter @logbeacon/react-native build
    ```
-3. （可选）联调 Next 占位接口：另开终端根目录 `pnpm --filter next-log-test dev`，浏览器包会先同步 beacon；RN 默认 beacon 为：
-   - **iOS 模拟器**：`http://localhost:3100/api/beacon`
-   - **Android 模拟器**：`http://10.0.2.2:3100/api/beacon`  
-   真机请改为电脑的局域网 IP（且 Next dev 需监听 `0.0.0.0` 或使用隧道）。
+
+3. 启动解码接收端（默认 `BEACON_BACKEND=loki`）：
+
+   ```bash
+   pnpm --filter beacon-decode-server start
+   ```
+
+   解码结果追加到 `examples/beacon-decode-server/decoded-output.ndjson`。
 
 ## 运行
 
@@ -28,35 +44,85 @@ pnpm --filter rn-log-test ios
 pnpm --filter rn-log-test android
 ```
 
-首次 iOS 需在 `examples/rn-log-test/ios` 执行 `bundle exec pod install`（参见 CLI 初始化提示）。
+根目录也可：`pnpm run dev:rn`（先 build 核心包再启动 Metro）。
 
-### Android：`SDK location not found`
+首次 iOS 需在 `examples/rn-log-test/ios` 执行：
 
-报错里若出现 **`ANDROID_HOME`** 或 **`local.properties` / `sdk.dir`**，与网络、代理**无关**，是本机未告诉 Gradle **Android SDK 路径**。
+```bash
+bundle install && bundle exec pod install
+```
 
-任选其一即可：
+### 默认 Beacon URL
 
-1. **环境变量**（当前终端或写入 `~/.zshrc`）：
-   ```bash
-   export ANDROID_HOME="$HOME/Library/Android/sdk"
-   ```
-   SDK 若装在其他位置，改成实际目录（Android Studio → Settings → Android SDK 里可见）。
+| 环境 | URL |
+|------|-----|
+| iOS 模拟器 | `http://localhost:3101/api/beacon` |
+| Android 模拟器 | `http://10.0.2.2:3101/api/beacon` |
+| 真机 | 在 App 内改为电脑局域网 IP，如 `http://192.168.x.x:3101/api/beacon` |
 
-2. **项目级**（路径按你本机修改；该文件已在 `.gitignore` 中，勿提交）：
-   ```bash
-   echo "sdk.dir=$HOME/Library/Android/sdk" > android/local.properties
-   ```
-   在示例根目录 `examples/rn-log-test` 下执行。
+连通性自检（手机浏览器或 curl）：
 
-### Android：依赖下载 / TLS 握手失败
+```bash
+curl -sS http://127.0.0.1:3101/api/beacon/health
+```
 
-若报错包含 `plugins.gradle.org`、`Remote host terminated the handshake`、`TLS protocol`，通常是访问 Gradle 插件仓库的网络或 Java TLS 环境问题（与「找不到 gradle-plugin 目录」不同）。`android/settings.gradle` 已配置优先 `google()` / `mavenCentral()` 再 `gradlePluginPortal()`，可减少对插件门户的直接依赖。
+## 测试场景
 
-仍失败时可自查：**JDK 17+**（Android Studio 自带 JBR）、关闭干扰 HTTPS 的代理/VPN、或在公司网络换热点试一次；国内可考虑自行配置阿里云等 Maven 镜像（需在 `pluginManagement.repositories` 中按需添加）。
+| 按钮 | 行为 |
+|------|------|
+| 发送 info 测试日志 | `log.info(...)` |
+| 发送 error 测试日志 | `log.error(new Error(...))` |
+| 去重测试 | 相同 `dedup-test-${Date.now()}` 连发 2 条 `info` |
+| 连发 6 条 | 6 条不同内容的 `info` |
+| requestFlush() | 立即触发上报 |
+
+调试输出：Metro / 原生 Console 中带 `[log store]`、`[log aggregator]`、`[logbeacon]` 等前缀。
+
+## 切换 SLS
+
+1. 在 `App.tsx` 将 import 改为 `@logbeacon/react-native/sls`，并更新界面 `BACKEND_LABEL`。
+2. 重新构建核心包：`pnpm --filter @logbeacon/react-native build`
+3. 重启 Metro（建议 `pnpm start -- --reset-cache`）。
+4. 解码服务需匹配：`BEACON_BACKEND=sls pnpm --filter beacon-decode-server start`
+
+## Android 排障
+
+**SDK location not found**：设置 `ANDROID_HOME` 或创建 `android/local.properties`（已 gitignore）：
+
+```bash
+echo "sdk.dir=$HOME/Library/Android/sdk" > android/local.properties
+```
+
+**Gradle / TLS / 依赖下载失败**（如 `fresco:drawee` + `Remote host terminated the handshake`）：
+
+- 多为访问 `repo.maven.apache.org` 网络或 TLS 问题，**不是** Nitro / 日志包代码问题。
+- 示例 `android/settings.gradle` 已配置阿里云 Maven 镜像；改完后执行：
+  ```bash
+  cd android && ./gradlew --stop && ./gradlew clean && cd ..
+  pnpm --filter rn-log-test android
+  ```
+- 需 **JDK 17+**（推荐 Android Studio 自带 JBR）；仍失败可换热点、关代理/VPN 后重试，或浏览器访问  
+  `https://maven.aliyun.com/repository/public` 确认网络。
+
+## Metro / monorepo
+
+- `watchFolders` 包含 `packages/` 与仓库根 `node_modules`（仅监视）。
+- `nodeModulesPaths` **仅**示例自身 `node_modules`，避免解析到仓库根其他 RN 版本。
+- `@logbeacon/react-native/loki` 与 `/sls` 在 `metro.config.js` 中显式映射到 `packages/react-native/dist/*/logs.js`（Metro 对 `exports` 子路径支持有限）。
+- 异常时：`pnpm --filter rn-log-test start -- --reset-cache`
+
+## 版本要求
+
+| 依赖 | 版本 |
+|------|------|
+| `react` | 19.x（RN 0.78 要求） |
+| `react-native` | ≥ 0.78.0（本示例 0.78.3） |
+| `react-native-nitro-modules` | ≥ 0.35.0 |
+| `react-native-nitro-sqlite` | ≥ 9.0.0 |
 
 ## 说明
 
-- 使用 **pnpm** 时，`@react-native/gradle-plugin`、`@react-native/codegen` 等默认嵌套在 `react-native` 内部，Gradle/React Native 会从 **`项目根/node_modules/@react-native/...`** 解析路径。本示例已在 `devDependencies` 中**显式声明** `@react-native/gradle-plugin` 与 `@react-native/codegen`（版本均与 `react-native` 一致），`pnpm install` 后上述目录会出现在示例的 `node_modules` 下。
-- Metro：**勿**把仓库根 `node_modules` 放进 `resolver.nodeModulesPaths`（否则会编到 `react-native@0.85` 等）。当前仅保留示例自身 `node_modules`，并对 `react-native` / `react` / `@babel/runtime` 使用 **`resolveRequest` + `require.resolve(..., { paths: [projectRoot] })`**；`watchFolders` 仍包含仓库根 `node_modules` 以便监视 pnpm 真实路径。仍异常时可 `pnpm start -- --reset-cache`。
-- Android 已开启 `usesCleartextTraffic`，便于开发环境访问 HTTP beacon。
-- 库在导入时会注册 `AppState` 生命周期（`page-hidden` 时会 flush）；界面上的 **requestFlush()** 对应 Web 的 `logbeacon:flush`。
+- `newArchEnabled=true`（nitro 依赖新架构）。
+- Android 已开启 `usesCleartextTraffic` 便于 HTTP beacon 开发。
+- iOS `NSAllowsLocalNetworking` 已开启，可访问 localhost / 局域网。
+- 导入时注册 `AppState` 生命周期（退后台会 flush）。

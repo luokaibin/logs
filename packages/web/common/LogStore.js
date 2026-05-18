@@ -9,7 +9,7 @@ import {
   DB_NAME,
   DB_VERSION,
 } from "@logbeacon/core/LogStore";
-
+import { BACKEND } from 'logbeacon-internal:backend';
 
 export const MixinLogStore = (BaseClass) => {
   /**
@@ -245,6 +245,20 @@ export const MixinLogStore = (BaseClass) => {
         cursor = await cursor.continue();
       }
       await tx.done;
+    }
+
+    /**
+     * @returns {Promise<{ ctxId: string, streamLabels: Record<string, string> }>}
+     */
+    async buildEncoderContext() {
+      if (BACKEND === 'loki') {
+        return {
+          streamLabels: {
+            host: globalThis.location.hostname,
+          },
+        };
+      }
+      return super.buildEncoderContext();
     }
 
     /**

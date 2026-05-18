@@ -1,4 +1,4 @@
-import { open } from "react-native-quick-sqlite";
+import { open } from "react-native-nitro-sqlite";
 
 class Database {
   static _instance = null;

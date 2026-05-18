@@ -8,6 +8,7 @@ import {
   STORE_DIGEST,
   STORE_META,
 } from "@logbeacon/core/LogStore";
+import { BACKEND } from 'logbeacon-internal:backend';
 
 /** @param {unknown} result */
 function sqliteFirstRow(result) {
@@ -40,7 +41,7 @@ function sqliteAllRows(result) {
 
 export const MixinLogStore = (BaseClass) => {
   /**
-   * LogStore — RN 侧通过 `react-native-quick-sqlite`（`../db/database.js`）持久化日志与元数据。
+   * LogStore — RN 侧通过 `react-native-nitro-sqlite`（`../db/database.js`）持久化日志与元数据。
    * 摘要去重窗口仅 2～3s（见 LogProcessor），Web 上因 SW 可能被回收才持久化 digest；RN 用 `_digestMemoryCache`（内存 Map），不建 digestCache 表。
    * `b_dat` / `meta` 走 SQLite；digest 走 `_digestMemoryCache`。与 core `ls*` 契约对齐。
    */
@@ -128,24 +129,12 @@ export const MixinLogStore = (BaseClass) => {
      */
     async lsAdd(storeName, value) {
       if (storeName === STORE_LOGS) {
-        const blob = this.encodeLog(value);
-        // 必须得到「长度 = 负载字节数」的独立 ArrayBuffer，再交给 JSI：
-        // 1) `new Uint8Array(blob).buffer` 的 backing 可能比 byteLength 大（对齐），native 若按 buffer 全长绑 BLOB 会写入脏尾或堆异常；
-        // 2) 无 `console.log(buffer)` 时偶发闪退、加上就正常，属于「延长引用/改变 GC 时机」掩盖了上述生命周期问题，不能依赖 console。
-        // const buffer =
-        //   blob.byteLength === 0
-        //     ? new ArrayBuffer(0)
-        //     : blob.buffer instanceof ArrayBuffer
-        //       ? blob.buffer.slice(
-        //           blob.byteOffset,
-        //           blob.byteOffset + blob.byteLength,
-        //         )
-        //       : new Uint8Array(blob).buffer.slice(0, blob.byteLength);
-        const buffer = new Uint8Array(blob).buffer.slice(0, blob.byteLength);
-        console.log("写入 buffer", buffer);
-        DB.execute(`INSERT INTO ${STORE_LOGS} (value) VALUES (?);`, [buffer]);
+        const encoded = this.encodeLog(value);
+        const rawBuffer = encoded.buffer;
+        const size = encoded.byteLength;
+        await DB.executeAsync(`INSERT INTO ${STORE_LOGS} (value) VALUES (?);`, [rawBuffer]);
         return {
-          size: blob.byteLength,
+          size,
         };
       }
       throw new Error(
@@ -282,6 +271,20 @@ export const MixinLogStore = (BaseClass) => {
           this._digestMemoryCache.delete(d);
         }
       }
+    }
+
+    /**
+     * @returns {Promise<{ ctxId: string, streamLabels: Record<string, string> }>}
+     */
+    async buildEncoderContext() {
+      if (BACKEND === 'loki') {
+        return {
+          streamLabels: {
+            platform: Platform.OS,
+          },
+        };
+      }
+      return super.buildEncoderContext();
     }
 
     /**

@@ -1,6 +1,7 @@
 /**
- * Logbeacon React Native 示例：与 `examples/next-log-test/app/page.tsx` 能力对齐，
- * 便于联调本地占位 beacon（如 Next 示例的 `POST /api/beacon` → 204）。
+ * Logbeacon React Native 示例：与 `examples/next-log-test/app/page.tsx` 能力对齐。
+ * 默认 Loki；测 SLS 时改为 `@logbeacon/react-native/sls`，执行
+ * `pnpm --filter @logbeacon/react-native build` 后重启 Metro。
  *
  * @format
  */
@@ -21,10 +22,13 @@ import {
 
 import log, {requestFlush, setBeaconUrl} from '@logbeacon/react-native';
 
-log.setLevel("TRACE")
+const BACKEND_LABEL = 'sls';
+
+log.setLevel('TRACE');
 
 function defaultBeaconUrl(): string {
-  const host = Platform.OS === 'android' ? 'http://192.168.1.79:3101' : 'http://localhost:3100';
+  const host =
+    Platform.OS === 'android' ? 'http://172.18.1.72:3101' : 'http://localhost:3101';
   return `${host}/api/beacon`;
 }
 
@@ -34,9 +38,6 @@ export default function App(): React.JSX.Element {
   const [status, setStatus] = useState('');
 
   useEffect(() => {
-    // 默认级别为 WARN，不放开则 info / debug 不会进入上报链路。
-    // ConsoleLogger 运行时使用大写键（与类型里的 'trace' 等小写声明不一致）。
-    // (log as {setLevel: (level: string) => void}).setLevel('TRACE');
     const initial = defaultBeaconUrl();
     void setBeaconUrl(initial).then(() => {
       setStatus(`已设置 beacon: ${initial}`);
@@ -62,8 +63,7 @@ export default function App(): React.JSX.Element {
   }, []);
 
   const onSendError = useCallback(() => {
-    const error = new Error('RN 示例：测试 error 级别');
-    log.error(error);
+    log.error(new Error('RN 示例：测试 error 级别'));
   }, []);
 
   const onDedupPair = useCallback(() => {
@@ -96,20 +96,30 @@ export default function App(): React.JSX.Element {
   return (
     <SafeAreaView style={[styles.safe, isDark && styles.safeDark]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.title, isDark && styles.textLight]}>Logbeacon × React Native</Text>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled">
+        <Text style={[styles.title, isDark && styles.textLight]}>
+          Logbeacon × React Native
+        </Text>
+        <Text style={[styles.badge, isDark && styles.badgeDark]}>
+          backend: {BACKEND_LABEL}
+        </Text>
         <Text style={[styles.p, isDark && styles.textLight]}>
-          依赖 <Text style={styles.code}>@logbeacon/react-native</Text>
+          依赖 <Text style={styles.code}>@logbeacon/react-native/loki</Text>
           ，能力与 Web 一致：SQLite 缓冲、聚合、按条件 flush；生命周期映射为{' '}
           <Text style={styles.code}>page-load</Text> /{' '}
           <Text style={styles.code}>page-visible</Text> /{' '}
           <Text style={styles.code}>page-hidden</Text>（退后台会触发上报）。
         </Text>
         <Text style={hintStyle}>
-          调试输出：请在 Metro / 原生调试器 Console 中查看带{' '}
-          <Text style={styles.code}>[log store]</Text>、<Text style={styles.code}>[log processor]</Text>、
-          <Text style={styles.code}>[log aggregator]</Text>、<Text style={styles.code}>[logbeacon]</Text>{' '}
-          等前缀的日志；同时观察对 beacon URL 的网络请求。
+          默认联调{' '}
+          <Text style={styles.code}>beacon-decode-server :3101</Text>
+          。调试输出：Metro / 原生 Console 中带{' '}
+          <Text style={styles.code}>[log store]</Text>、
+          <Text style={styles.code}>[log aggregator]</Text>、
+          <Text style={styles.code}>[logbeacon]</Text> 等前缀；解码结果见{' '}
+          <Text style={styles.code}>decoded-output.ndjson</Text>。
         </Text>
 
         <Text style={[styles.label, isDark && styles.textLight]}>Beacon URL</Text>
@@ -154,7 +164,19 @@ const styles = StyleSheet.create({
   safe: {flex: 1, backgroundColor: '#f6f6f6'},
   safeDark: {backgroundColor: '#121212'},
   scroll: {padding: 16, paddingBottom: 32},
-  title: {fontSize: 22, fontWeight: '700', marginBottom: 12},
+  title: {fontSize: 22, fontWeight: '700', marginBottom: 8},
+  badge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#dbeafe',
+    color: '#1e40af',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  badgeDark: {backgroundColor: '#1e3a5f', color: '#93c5fd'},
   p: {fontSize: 15, lineHeight: 22, marginBottom: 10},
   hint: {fontSize: 13, lineHeight: 20, marginBottom: 16},
   textLight: {color: '#eee'},

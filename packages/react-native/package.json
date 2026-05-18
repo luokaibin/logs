@@ -70,8 +70,10 @@
   "homepage": "https://github.com/luokaibin/logs#readme",
   "license": "MIT",
   "peerDependencies": {
-    "react-native": ">=0.64.0",
-    "react-native-quick-sqlite": ">=8.2.7"
+    "react": ">=19.0.0",
+    "react-native": ">=0.78.0",
+    "react-native-nitro-modules": ">=0.35.0",
+    "react-native-nitro-sqlite": ">=9.0.0"
   },
   "dependencies": {
     "@logbeacon/core": "workspace:*",

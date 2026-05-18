@@ -7,9 +7,8 @@ import { decodeLogs as decodeLoki } from '@logbeacon/ingest/loki';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** 与客户端 beacon 变体一致：`sls`（默认）或 `loki` */
-// const backend = process.env.BEACON_BACKEND === 'loki' ? 'loki' : 'sls';
-const backend = 'sls';
+/** 与客户端 beacon 变体一致：`loki`（默认）或 `sls` */
+const backend = "sls";
 /** 解码结果追加写入的路径（每请求一行 JSON.stringify，无缩进） */
 const outputFile =
   process.env.DECODE_OUTPUT_FILE ?? path.join(__dirname, 'decoded-output.ndjson');

@@ -29,6 +29,22 @@ function createWebCoreLogAggregatorPlaceholderPlugin(variant) {
   };
 }
 
+function createBackendConstantPlugin(variant) {
+  const VIRTUAL_ID = 'logbeacon-internal:backend';
+  const RESOLVED = '\0' + VIRTUAL_ID;
+  return {
+    name: `rn-backend-${variant}`,
+    resolveId(id) {
+      if (id === VIRTUAL_ID) return RESOLVED;
+    },
+    load(id) {
+      if (id === RESOLVED) {
+        return `export const BACKEND = ${JSON.stringify(variant)};`;
+      }
+    },
+  };
+}
+
 /**
  * terser 插件的配置项
  * 用于压缩和混淆 JavaScript 代码
@@ -125,6 +141,7 @@ export default [
     // 使用上面定义的插件数组
     plugins: [
       createWebCoreLogAggregatorPlaceholderPlugin('sls'),
+      createBackendConstantPlugin('sls'),
       resolvePlugin,
       commonjsPlugin,
       terserPlugin,
@@ -169,6 +186,7 @@ export default [
     // 使用上面定义的插件数组
     plugins: [
       createWebCoreLogAggregatorPlaceholderPlugin('loki'),
+      createBackendConstantPlugin('loki'),
       resolvePlugin,
       commonjsPlugin,
       terserPlugin,

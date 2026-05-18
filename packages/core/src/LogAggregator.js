@@ -27,6 +27,12 @@ import logEncoder from 'logbeacon-internal:log-encoder';
  */
 
 /**
+ * @typedef {Object} EncoderContext
+ * @property {string} ctxId - 日志批次上下文 ID
+ * @property {Record<string, string>} [streamLabels] - Loki stream 标签（由平台 mixin 组装）
+ */
+
+/**
  * 日志聚合器类
  * 继承自LogProcessor，负责日志的批量聚合、处理和发送
  */
@@ -234,14 +240,22 @@ export class LogAggregator extends LogProcessor {
   }
   
   /**
+   * 组装编码器上下文（ctxId 由 core 生成；streamLabels 由平台 mixin 补充）
+   * @returns {Promise<EncoderContext>}
+   */
+  async buildEncoderContext() {
+    return { ctxId: await this._generateLogContext() };
+  }
+
+  /**
    * 压缩并发送日志
    * @returns {Promise<void>}
    */
   async flushLogs() {
     const {logs: logBuffer} = await this._loadAndDecodeLogsFromDB();
     if (!logBuffer || logBuffer.length === 0) return;
-    const ctxId = await this?._generateLogContext?.();
-    const payload = logEncoder(logBuffer, ctxId);
+    const encoderContext = await this.buildEncoderContext();
+    const payload = logEncoder(logBuffer, encoderContext);
     if (!payload) return;
     const body = this._compressLogs(payload);
     const beaconUrl = await this._getBeaconUrl();
